@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Fix: Added SHABAT_DISHES to imports from constants
@@ -199,12 +198,14 @@ const MenuBuilder: React.FC = () => {
             </h3>
             
             <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-              {Object.entries(selections).map(([catId, items]) => {
+              {/* Fix: Added explicit type annotation to handle 'unknown' inference in some environments */}
+              {Object.entries(selections).map(([catId, items]: [string, string[]]) => {
                 if (items.length === 0) return null;
                 return (
                   <div key={catId}>
                     <div className="grid gap-2">
-                      {items.map(id => {
+                      {/* Fix: Added explicit type annotation to handle 'unknown' inference error */}
+                      {items.map((id: string) => {
                         const item = SHABAT_DISHES.find(i => i.id === id) || 
                                      activeMenu.categories.flatMap(c => c.items).find(i => i.id === id);
                         return (
@@ -220,7 +221,8 @@ const MenuBuilder: React.FC = () => {
                   </div>
                 );
               })}
-              {Object.values(selections).every(arr => arr.length === 0) && (
+              {/* Fix: Casted Object.values to string[][] to fix 'unknown' property length error */}
+              {(Object.values(selections) as string[][]).every((arr: string[]) => arr.length === 0) && (
                 <div className="text-center py-10 opacity-30 italic">
                    טרם נבחרו מנות...
                 </div>
@@ -229,7 +231,8 @@ const MenuBuilder: React.FC = () => {
 
             <div className="mt-8 pt-8 border-t border-white/10">
               <button 
-                disabled={isSubmitting || Object.values(selections).every(v => v.length === 0)}
+                /* Fix: Casted Object.values to string[][] to fix 'unknown' property length error */
+                disabled={isSubmitting || (Object.values(selections) as string[][]).every((v: string[]) => v.length === 0)}
                 onClick={handleFinish}
                 className="w-full py-4 rounded-2xl font-bold text-lg shadow-2xl bg-gold hover:bg-yellow-600 text-white transition-all transform active:scale-95 disabled:bg-white/5 disabled:text-neutral-600 disabled:cursor-not-allowed"
               >

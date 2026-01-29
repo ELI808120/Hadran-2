@@ -1,8 +1,12 @@
 
+console.log("🚀 Index.tsx: Entry point reached.");
+
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter as Router, Routes, Route, Link, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+
+console.log("📦 Index.tsx: Imports successful.");
 
 // --- TYPES ---
 enum OrderStatus {
@@ -118,6 +122,7 @@ const SHABAT_DISHES = [
 ];
 
 // --- SUPABASE CLIENT ---
+console.log("🛠️ Supabase: Initializing with URL: ", process.env.SUPABASE_URL ? "Exists" : "MISSING");
 const supabase = createClient(
   process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
   process.env.SUPABASE_ANON_KEY || 'placeholder-key'
@@ -138,7 +143,7 @@ const LandingPage = () => {
       if (error) throw error;
       setSubmitted(true);
     } catch (err) {
-      alert('שגיאה בשליחה. וודא ש-Supabase מוגדר.');
+      alert('שגיאה בשליחה. וודא ש-Supabase מוגדר ב-LocalStorage או במערכת.');
     } finally { setIsSubmitting(false); }
   };
 
@@ -256,7 +261,7 @@ const AdminDashboard = () => {
     <div className="p-8 max-w-7xl mx-auto">
       <h1 className="text-3xl font-bold mb-8">ניהול הזמנות</h1>
       <div className="bg-white rounded-2xl shadow overflow-hidden">
-        <table className="w-full text-right">
+        <table className="w-full text-right border-collapse">
           <thead className="bg-slate-50 border-b">
             <tr>
               <th className="p-4">לקוח</th>
@@ -286,9 +291,15 @@ const AdminDashboard = () => {
 // --- MAIN APP ---
 
 const App = () => {
+  console.log("🧩 App: Component rendering...");
   const [user, setUser] = useState<any>(null);
+  
   useEffect(() => {
-    supabase.auth.getSession().then(({data:{session}}) => setUser(session?.user));
+    console.log("🧩 App: Fetching session...");
+    supabase.auth.getSession().then(({data:{session}}) => {
+      console.log("🧩 App: Session status: ", session ? "Logged in" : "Guest");
+      setUser(session?.user);
+    });
     supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user));
   }, []);
 
@@ -304,11 +315,18 @@ const App = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/order/:orderId" element={<MenuBuilder />} />
-        <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
-        <Route path="/login" element={<div className="p-20 text-center">התחבר דרך Supabase Dashboard</div>} />
+        <Route path="/admin" element={user ? <AdminDashboard /> : <div className="p-20 text-center">נא להתחבר דרך לוח הבקרה של Supabase.</div>} />
       </Routes>
     </Router>
   );
 };
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
+console.log("🏁 Index.tsx: Attempting to mount React...");
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  console.error("❌ Root element not found!");
+} else {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(<App />);
+  console.log("✅ Index.tsx: Render call complete.");
+}
