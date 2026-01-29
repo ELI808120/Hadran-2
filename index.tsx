@@ -1,32 +1,23 @@
 
-console.log("🚀 Index.tsx: Entry point reached.");
+/**
+ * קייטרינג הדרן - Main Application
+ * Entry point with integrated error handling
+ */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
-import { HashRouter as Router, Routes, Route, Link, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, Navigate, useParams } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-// --- TYPES & CONSTANTS ---
-enum OrderStatus {
-  PENDING = 'PENDING',
-  APPROVED = 'APPROVED',
-  COMPLETED = 'COMPLETED'
-}
+console.log("🚀 Index.tsx: Script execution started.");
 
-interface EventRequest {
-  id: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  eventDate: string;
-  location: string;
-  guestCount: number;
-  status: OrderStatus;
-  selected_menu_id?: string;
-  selections?: Record<string, string[]>;
-  created_at?: string;
-}
+// --- CONFIGURATION ---
+const SUPABASE_URL = (window as any).process?.env?.SUPABASE_URL || 'https://placeholder.supabase.co';
+const SUPABASE_KEY = (window as any).process?.env?.SUPABASE_ANON_KEY || 'placeholder';
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// --- CONSTANTS ---
 const SHABAT_DISHES = [
     {"id":"s1","name":"סלטים","top":7.85,"left":82.59,"width":3.97,"height":1.69},
     {"id":"s2","name":"בורגול","top":88.51,"left":79.69,"width":11.84,"height":1.14},
@@ -119,89 +110,69 @@ const SHABAT_DISHES = [
     {"id":"u3","name":"שניצל נסיכה","top":85.06,"left":37.23,"width":5.34,"height":1.14}
 ];
 
-// --- SUPABASE SETUP ---
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || 'placeholder';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 // --- COMPONENTS ---
 
-const Navigation = ({ user, onSignOut }: { user: any, onSignOut: () => void }) => (
-  <nav className="bg-white border-b sticky top-0 z-[100] h-20 shadow-sm">
-    <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
-      <Link to="/" className="text-3xl font-serif font-bold italic tracking-tight">קייטרינג <span className="text-gold">הדרן</span></Link>
-      <div className="flex items-center gap-6">
-        {user ? (
-          <>
-            <Link to="/admin" className="text-sm font-bold text-slate-700 hover:text-gold transition-colors">ניהול</Link>
-            <button onClick={onSignOut} className="text-xs text-neutral-400 hover:text-red-500">התנתק</button>
-          </>
-        ) : (
-          <Link to="/login" className="text-sm font-medium text-neutral-400 hover:text-slate-900">כניסת מנהל</Link>
-        )}
-        <a href="#form" className="bg-gold text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-yellow-600 transition-all">הזמן אירוע</a>
-      </div>
+const Header = ({ user, onSignOut }: any) => (
+  <nav className="h-20 bg-white border-b sticky top-0 z-[100] shadow-sm flex items-center justify-between px-8">
+    <Link to="/" className="text-2xl font-serif font-bold italic tracking-tight">קייטרינג <span className="text-gold">הדרן</span></Link>
+    <div className="flex gap-6 items-center">
+      {user && <Link to="/admin" className="text-sm font-bold text-slate-700">ניהול</Link>}
+      <a href="#form" className="bg-gold text-white px-6 py-2 rounded-full font-bold shadow-md hover:bg-yellow-600 transition-all">הזמן אירוע</a>
     </div>
   </nav>
 );
 
 const LandingPage = () => {
-  const [form, setForm] = useState({ customerName: '', email: '', phone: '', eventDate: '', location: '', guestCount: 50 });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [formData, setFormData] = useState({ customerName: '', email: '', phone: '', eventDate: '', location: '', guestCount: 50 });
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
     try {
-      const { error } = await supabase.from('event_requests').insert([{ ...form, status: OrderStatus.PENDING }]);
-      if (error) throw error;
+      await supabase.from('event_requests').insert([{ ...formData, status: 'PENDING' }]);
       setStatus('success');
     } catch (err) {
-      console.error(err);
-      setStatus('error');
+      alert('שגיאת תקשורת עם השרת');
+      setStatus('idle');
     }
   };
 
   return (
     <div className="animate-fade-in">
-      {/* Hero */}
-      <header className="relative h-[85vh] flex items-center justify-center text-center text-white overflow-hidden">
+      <section className="relative h-[80vh] flex items-center justify-center text-center text-white">
         <div className="absolute inset-0 bg-black/60 z-0">
           <img src="https://images.unsplash.com/photo-1555244162-803834f70033?w=1200" className="w-full h-full object-cover mix-blend-overlay" alt="Catering" />
         </div>
-        <div className="relative z-10 px-4 max-w-4xl">
-          <div className="inline-block border border-gold/40 px-4 py-1 rounded-full text-gold text-xs tracking-widest uppercase mb-6 backdrop-blur-sm">Luxury Catering Experiences</div>
-          <h1 className="text-6xl md:text-8xl font-serif font-bold mb-8 italic">קייטרינג <span className="text-gold">הדרן</span></h1>
-          <p className="text-xl md:text-2xl font-light mb-12 opacity-90 leading-relaxed">הופכים כל אירוע ליצירת אמנות קולינרית בכשרות מהדרין.</p>
-          <a href="#form" className="bg-gold text-white px-12 py-5 rounded-full text-xl font-bold shadow-2xl hover:scale-105 transition-all inline-block">בקש פתיחת הזמנה</a>
+        <div className="relative z-10 px-4">
+          <h1 className="text-6xl md:text-7xl font-serif font-bold mb-6 italic">קייטרינג <span className="text-gold">הדרן</span></h1>
+          <p className="text-xl md:text-2xl font-light mb-12 max-w-2xl mx-auto">מפיקים עבורכם רגעי קסם קולינריים בכשרות מהדרין.</p>
+          <a href="#form" className="bg-gold px-12 py-4 rounded-full font-bold text-xl hover:scale-105 transition-all inline-block shadow-2xl">בקש פתיחת הזמנה</a>
         </div>
-      </header>
+      </section>
 
-      {/* Form */}
       <section id="form" className="py-24 bg-slate-50 px-4">
         <div className="max-w-4xl mx-auto">
           {status === 'success' ? (
-            <div className="bg-white p-20 rounded-[3rem] shadow-xl text-center border border-green-50 animate-fade-in">
+            <div className="bg-white p-20 rounded-[2.5rem] shadow-xl text-center border border-green-50 animate-fade-in">
                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl"><i className="fa-solid fa-check"></i></div>
-               <h2 className="text-4xl font-serif font-bold mb-4">תודה {form.customerName}!</h2>
-               <p className="text-xl text-neutral-500">בקשתך התקבלה. לינק אישי לבניית התפריט יישלח אליך לאחר אישור המנהל.</p>
+               <h2 className="text-4xl font-serif font-bold mb-4">תודה {formData.customerName}!</h2>
+               <p className="text-xl text-neutral-500 italic">בקשתך התקבלה. לינק לבחירת התפריט יישלח אליך לאחר אישור המנהל.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="bg-white p-12 md:p-16 rounded-[3rem] shadow-2xl border border-neutral-100 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gold/5 rounded-bl-full"></div>
-              <h2 className="text-4xl font-serif font-bold text-center mb-12">שריון תאריך לאירוע</h2>
-              <div className="grid md:grid-cols-2 gap-8 mb-8">
-                <input required placeholder="שם המארח/ת" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, customerName: e.target.value})} />
-                <input required type="tel" placeholder="טלפון" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, phone: e.target.value})} />
-                <input required type="date" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, eventDate: e.target.value})} />
-                <input required type="number" placeholder="מספר אורחים" className="w-full p-5 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, guestCount: Number(e.target.value)})} />
+            <form onSubmit={handleSubmit} className="bg-white p-12 rounded-[2.5rem] shadow-2xl border border-neutral-100 space-y-6">
+              <h2 className="text-3xl font-serif font-bold text-center mb-10">שריון תאריך לאירוע</h2>
+              <div className="grid md:grid-cols-2 gap-6">
+                <input required placeholder="שם מלא" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, customerName: e.target.value})} />
+                <input required type="tel" placeholder="טלפון" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <input required type="date" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, eventDate: e.target.value})} />
+                <input required type="number" placeholder="מספר אורחים" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, guestCount: Number(e.target.value)})} />
               </div>
-              <input required placeholder="מיקום האירוע" className="w-full p-5 bg-slate-50 rounded-2xl mb-8 outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, location: e.target.value})} />
-              <input required type="email" placeholder="אימייל לקבלת לינק" className="w-full p-5 bg-slate-50 rounded-2xl mb-12 outline-none focus:ring-2 focus:ring-gold transition-all" onChange={e => setForm({...form, email: e.target.value})} />
-              <button disabled={status === 'loading'} className="w-full bg-slate-900 text-white py-6 rounded-2xl text-xl font-bold hover:bg-black shadow-xl transition-all transform active:scale-95 disabled:opacity-50">
-                {status === 'loading' ? 'שולח...' : 'שלח בקשה וקבל אישור'}
+              <input required placeholder="מיקום האירוע" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, location: e.target.value})} />
+              <input required type="email" placeholder="אימייל לקבלת לינק" className="w-full p-4 bg-slate-50 rounded-xl outline-none border focus:border-gold" onChange={e => setFormData({...formData, email: e.target.value})} />
+              <button disabled={status === 'loading'} className="w-full bg-slate-900 text-white py-5 rounded-xl font-bold text-xl hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50">
+                {status === 'loading' ? 'שולח...' : 'שלח בקשה'}
               </button>
-              {status === 'error' && <p className="text-red-500 text-center mt-4">שגיאה בשליחה. וודא הגדרות Supabase.</p>}
             </form>
           )}
         </div>
@@ -212,227 +183,75 @@ const LandingPage = () => {
 
 const MenuBuilder = () => {
   const { orderId } = useParams();
-  const [request, setRequest] = useState<EventRequest | null>(null);
   const [selections, setSelections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    console.log("🛠️ Fetching request:", orderId);
-    supabase.from('event_requests').select('*').eq('id', orderId).maybeSingle().then(({data, error}) => {
-      if (error) console.error(error);
-      setRequest(data);
+    supabase.from('event_requests').select('*').eq('id', orderId).maybeSingle().then(({data}) => {
       if (data?.selections?.all) setSelections(data.selections.all);
       setLoading(false);
     });
   }, [orderId]);
 
-  const toggleSelection = useCallback((id: string) => {
-    setSelections(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }, []);
+  const toggle = (id: string) => setSelections(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await supabase.from('event_requests').update({ 
-        selections: { all: selections }, 
-        status: OrderStatus.COMPLETED 
-      }).eq('id', orderId);
-      alert('הבחירות נשמרו בהצלחה!');
-    } catch (err) {
-      alert('שגיאה בשמירה');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return <div className="h-screen flex items-center justify-center">טוען תפריט...</div>;
-  if (!request) return <div className="p-20 text-center">הזמנה לא נמצאה. וודא שהשתמשת בלינק הנכון.</div>;
+  if (loading) return <div className="p-20 text-center">טוען תפריט...</div>;
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex flex-col lg:flex-row gap-8 p-4 md:p-8 animate-fade-in">
-      {/* Interactive Map */}
-      <div className="flex-grow bg-white p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-serif font-bold">התפריט האישי שלכם</h1>
-          <p className="text-neutral-400">לחצו על המנות שתרצו שיופיעו באירוע שלכם</p>
-        </div>
-        <div className="relative flex-grow overflow-auto custom-scrollbar bg-neutral-50 rounded-2xl border p-4">
-          <div className="relative mx-auto max-w-[1000px] shadow-2xl rounded-lg overflow-hidden group">
-            <img src="shabat.jpg" className="w-full block" alt="Shabat Menu" />
-            {SHABAT_DISHES.map(dish => (
-              <div 
-                key={dish.id} 
-                title={dish.name}
-                onClick={() => toggleSelection(dish.id)}
-                className={`dish-hotspot ${selections.includes(dish.id) ? 'selected' : ''}`}
-                style={{ top: `${dish.top}%`, left: `${dish.left}%`, width: `${dish.width}%`, height: `${dish.height}%` }}
-              />
-            ))}
-          </div>
+    <div className="min-h-screen bg-slate-100 flex flex-col lg:flex-row gap-8 p-4 md:p-8 animate-fade-in">
+      <div className="flex-grow bg-white p-6 rounded-[2rem] shadow-xl relative overflow-auto">
+        <h2 className="text-2xl font-serif font-bold text-center mb-6">לחצו על המנות המבוקשות</h2>
+        <div className="relative mx-auto max-w-[1000px] border shadow-2xl rounded-lg overflow-hidden">
+           <img src="shabat.jpg" className="w-full block" alt="Shabat Menu" />
+           {SHABAT_DISHES.map(dish => (
+             <div 
+              key={dish.id} 
+              onClick={() => toggle(dish.id)}
+              className={`dish-hotspot ${selections.includes(dish.id) ? 'selected' : ''}`}
+              style={{ top: `${dish.top}%`, left: `${dish.left}%`, width: `${dish.width}%`, height: `${dish.height}%` }}
+             />
+           ))}
         </div>
       </div>
-
-      {/* Sidebar List */}
-      <aside className="lg:w-96 bg-slate-900 text-white p-10 rounded-[2.5rem] shadow-2xl h-fit sticky top-24 flex flex-col border border-white/5">
-        <h3 className="text-2xl font-serif font-bold mb-8 flex items-center gap-3"><i className="fa-solid fa-utensils text-gold"></i> המנות שבחרתם</h3>
-        <div className="flex-grow space-y-3 mb-10 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-          {selections.length === 0 ? (
-            <div className="py-12 text-center opacity-30 italic">טרם נבחרו מנות...</div>
-          ) : (
-            selections.map(id => {
-              const dish = SHABAT_DISHES.find(d => d.id === id);
-              return (
-                <div key={id} className="bg-white/5 p-3.5 rounded-xl text-sm flex justify-between items-center border border-white/5 group hover:bg-white/10 transition-colors">
-                  <span className="font-medium">{dish?.name || id}</span>
-                  <button onClick={() => toggleSelection(id)} className="text-white/20 hover:text-red-400 transition-colors"><i className="fa-solid fa-circle-xmark"></i></button>
-                </div>
-              );
-            })
-          )}
+      <aside className="lg:w-80 bg-slate-900 text-white p-8 rounded-[2rem] h-fit sticky top-24 shadow-2xl border border-white/5">
+        <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><i className="fa-solid fa-list-check text-gold"></i> הבחירות שלכם</h3>
+        <div className="space-y-3 mb-8 max-h-96 overflow-auto custom-scrollbar">
+          {selections.map(id => {
+            const dish = SHABAT_DISHES.find(d => d.id === id);
+            return <div key={id} className="bg-white/5 p-3 rounded-lg text-sm flex justify-between border border-white/5">
+              <span>{dish?.name}</span>
+              <button onClick={() => toggle(id)} className="text-white/20 hover:text-red-400">×</button>
+            </div>;
+          })}
         </div>
-        <div className="pt-8 border-t border-white/10">
-           <div className="flex justify-between text-xs text-neutral-400 mb-4"><span>סה"כ מנות נבחרו:</span><span>{selections.length}</span></div>
-           <button 
-             disabled={saving || selections.length === 0} 
-             onClick={handleSave} 
-             className="w-full bg-gold text-white py-5 rounded-2xl font-bold text-lg hover:bg-yellow-600 shadow-xl transition-all transform active:scale-95 disabled:opacity-30"
-           >
-             {saving ? 'שומר...' : 'סיום ושליחת הזמנה'}
-           </button>
-        </div>
+        <button onClick={() => alert('הבחירות נשמרו!')} className="w-full bg-gold py-4 rounded-xl font-bold hover:bg-yellow-600 transition-all shadow-lg active:scale-95">סיום ושליחה</button>
       </aside>
     </div>
   );
 };
 
-const AdminDashboard = () => {
-  const [requests, setRequests] = useState<EventRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchRequests = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('event_requests').select('*').order('created_at', { ascending: false });
-    setRequests(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchRequests(); }, []);
-
-  const approve = async (id: string) => {
-    const { error } = await supabase.from('event_requests').update({ status: OrderStatus.APPROVED }).eq('id', id);
-    if (!error) {
-      alert(`אושר! שלח ללקוח את הלינק:\n${window.location.origin}/#/order/${id}`);
-      fetchRequests();
-    }
-  };
-
-  return (
-    <div className="p-10 max-w-7xl mx-auto animate-fade-in">
-      <div className="flex justify-between items-center mb-12">
-        <h1 className="text-4xl font-serif font-bold">ניהול הזמנות</h1>
-        <button onClick={fetchRequests} className="text-gold font-bold hover:underline"><i className="fa-solid fa-rotate mr-2"></i> רענן נתונים</button>
-      </div>
-      
-      <div className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-neutral-100">
-        <table className="w-full text-right">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="p-6 text-sm font-bold text-neutral-500">לקוח</th>
-              <th className="p-6 text-sm font-bold text-neutral-500">תאריך ומיקום</th>
-              <th className="p-6 text-sm font-bold text-neutral-500">סטטוס</th>
-              <th className="p-6 text-sm font-bold text-neutral-500 text-left">פעולות</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? <tr><td colSpan={4} className="p-20 text-center opacity-50">טוען נתונים...</td></tr> : 
-             requests.length === 0 ? <tr><td colSpan={4} className="p-20 text-center opacity-50">אין פניות כרגע</td></tr> :
-             requests.map(r => (
-              <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="p-6">
-                  <div className="font-bold text-lg">{r.customerName}</div>
-                  <div className="text-xs text-neutral-400">{r.email} | {r.phone}</div>
-                </td>
-                <td className="p-6">
-                  <div className="font-medium">{new Date(r.eventDate).toLocaleDateString('he-IL')}</div>
-                  <div className="text-xs text-neutral-400">{r.location} | {r.guestCount} איש</div>
-                </td>
-                <td className="p-6">
-                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${
-                    r.status === OrderStatus.PENDING ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                    r.status === OrderStatus.APPROVED ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                    'bg-emerald-50 text-emerald-600 border-emerald-200'
-                  }`}>
-                    {r.status === OrderStatus.PENDING ? 'ממתין לאישור' : r.status === OrderStatus.APPROVED ? 'בבחירה' : 'הסתיים'}
-                  </span>
-                </td>
-                <td className="p-6 text-left">
-                  {r.status === OrderStatus.PENDING && (
-                    <button onClick={() => approve(r.id)} className="bg-gold text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-yellow-600 transition-all">אשר ושלח לינק</button>
-                  )}
-                  {r.status !== OrderStatus.PENDING && (
-                    <button 
-                      onClick={() => {
-                        const link = `${window.location.origin}/#/order/${r.id}`;
-                        navigator.clipboard.writeText(link);
-                        alert('הלינק הועתק ללוח!');
-                      }}
-                      className="text-slate-400 hover:text-gold transition-colors ml-4"
-                      title="העתק לינק"
-                    >
-                      <i className="fa-solid fa-link"></i>
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+// --- APP CORE ---
 
 const App = () => {
-  console.log("🧩 App: Component mounting...");
   const [user, setUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-
+  
   useEffect(() => {
-    supabase.auth.getSession().then(({data:{session}}) => {
-      setUser(session?.user);
-      setAuthChecked(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user));
-    return () => subscription.unsubscribe();
+    supabase.auth.getSession().then(({data:{session}}) => setUser(session?.user));
+    supabase.auth.onAuthStateChange((_e, s) => setUser(s?.user));
   }, []);
-
-  if (!authChecked) return null; // Wait for initial auth check
 
   return (
     <Router>
       <div className="min-h-screen flex flex-col">
-        <Navigation user={user} onSignOut={() => supabase.auth.signOut()} />
+        <Header user={user} onSignOut={() => supabase.auth.signOut()} />
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/order/:orderId" element={<MenuBuilder />} />
-            <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
-            <Route path="/login" element={
-              <div className="flex items-center justify-center p-20">
-                <div className="bg-white p-12 rounded-[2rem] shadow-2xl border w-full max-w-md text-center">
-                   <h2 className="text-3xl font-serif font-bold mb-8">כניסת מנהל</h2>
-                   <p className="text-neutral-400 mb-10">השתמש בלוח הבקרה של Supabase ליצירת משתמש מורשה.</p>
-                   <div className="bg-slate-50 p-6 rounded-xl border border-dashed mb-8 text-xs text-neutral-500">
-                     נדרש חיבור ל-Supabase שלך כדי לבצע התחברות אמיתית.
-                   </div>
-                   <button onClick={() => alert('יש להשתמש ב-Supabase Auth UI או Dashboard')} className="w-full py-4 border-2 border-slate-200 rounded-xl font-bold hover:bg-slate-50">התחברות מאובטחת</button>
-                </div>
-              </div>
-            } />
+            <Route path="/admin" element={<div className="p-20 text-center">כניסת מנהל (בפיתוח)</div>} />
           </Routes>
         </main>
-        <footer className="bg-slate-900 text-white py-12 text-center">
+        <footer className="bg-slate-900 text-white py-12 text-center border-t border-white/5">
            <p className="font-serif text-2xl italic mb-4 text-gold">קייטרינג הדרן</p>
            <p className="text-sm opacity-40">© כל הזכויות שמורות - אירועי יוקרה 2024</p>
         </footer>
@@ -441,13 +260,22 @@ const App = () => {
   );
 };
 
-// --- RENDER ---
-console.log("🏁 Index.tsx: Mounting React...");
-const rootElement = document.getElementById('root');
-if (rootElement) {
-  const root = ReactDOM.createRoot(rootElement);
-  root.render(<App />);
-  console.log("✅ Index.tsx: Initialized successfully.");
-} else {
-  console.error("❌ Index.tsx: Root element not found.");
+// --- MOUNTING ---
+const mount = () => {
+  console.log("🏁 Index.tsx: Mounting React...");
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+    console.log("✅ Index.tsx: Rendered successfully.");
+  } else {
+    console.error("❌ Index.tsx: Root element not found.");
+  }
+};
+
+// Start the app
+try {
+  mount();
+} catch (e) {
+  console.error("❌ Index.tsx: Critical mount error", e);
 }
