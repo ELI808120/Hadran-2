@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { databaseService } from '../services/database';
+import { emailService } from '../services/email';
 import { EventRequest, OrderStatus } from '../types';
 import { MENUS } from '../constants';
 
 const AdminDashboard: React.FC = () => {
   const [requests, setRequests] = useState<EventRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'active'>('pending');
   const [showEmailModal, setShowEmailModal] = useState<{show: boolean, request?: EventRequest}>({show: false});
 
@@ -20,24 +22,41 @@ const AdminDashboard: React.FC = () => {
       const data = await databaseService.getRequests();
       setRequests(data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load requests:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = (req: EventRequest) => {
+  const handleApproveClick = (req: EventRequest) => {
     setShowEmailModal({show: true, request: req});
   };
 
-  const confirmApproval = async (id: string) => {
+  const confirmApprovalAndSendEmail = async (req: EventRequest) => {
+    setSendingEmail(true);
     try {
-      await databaseService.updateRequestStatus(id, OrderStatus.APPROVED);
+      const orderLink = `${window.location.origin}/#/order/${req.id}`;
+      
+      // 1. Send real email via EmailJS
+      await emailService.sendApprovalEmail({
+        customer_name: req.customerName,
+        customer_email: req.email,
+        event_date: new Date(req.eventDate).toLocaleDateString('he-IL'),
+        location: req.location,
+        order_link: orderLink
+      });
+
+      // 2. Update status in Supabase
+      await databaseService.updateRequestStatus(req.id, OrderStatus.APPROVED);
+      
       await loadRequests();
       setShowEmailModal({show: false});
-      alert('ההזמנה אושרה והמייל נשלח (סימולציה)!');
+      alert(`ההזמנה אושרה! המייל נשלח לכתובת: ${req.email}`);
     } catch (err) {
-      alert('אירעה שגיאה בעדכון הסטטוס');
+      console.error(err);
+      alert('אירעה שגיאה בתהליך האישור או בשליחת המייל.');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -52,8 +71,8 @@ const AdminDashboard: React.FC = () => {
 
     let html = `
       <div dir="rtl" style="font-family: sans-serif; padding: 40px; border: 2px solid #333;">
-        <h1 style="text-align: center; border-bottom: 2px solid #d4af37; padding-bottom: 10px;">פקודת עבודה - קייטרינג הדרן</h1>
-        <div style="display: flex; justify-content: space-between; margin: 20px 0; font-size: 1.1em;">
+        <h1 style="text-align: center; border-bottom: 2px solid #d4af37; padding-bottom: 10px; color: #d4af37;">פקודת עבודה - קייטרינג הדרן</h1>
+        <div style="display: flex; justify-content: space-between; margin: 20px 0; font-size: 1.1em; background: #fafafa; padding: 15px; border-radius: 8px;">
           <div>
             <strong>לקוח:</strong> ${request.customerName}<br>
             <strong>תאריך:</strong> ${new Date(request.eventDate).toLocaleDateString('he-IL')}<br>
@@ -64,23 +83,23 @@ const AdminDashboard: React.FC = () => {
             <strong>תפריט:</strong> ${menu.name}
           </div>
         </div>
-        <hr>
         <div style="margin-top: 30px;">
           ${Object.entries(request.selections).map(([catId, itemIds]) => {
             const cat = menu.categories.find(c => c.id === catId);
             return `
               <div style="margin-bottom: 25px;">
-                <h3 style="background: #f4f4f4; padding: 8px 15px; border-right: 4px solid #d4af37;">${cat?.title}</h3>
-                <ul style="list-style: none; padding-right: 20px;">
+                <h3 style="background: #333; color: #fff; padding: 10px 15px; border-radius: 4px;">${cat?.title}</h3>
+                <ul style="list-style: none; padding-right: 10px;">
                   ${itemIds.map(iid => {
                     const item = cat?.items.find(i => i.id === iid);
-                    return `<li style="padding: 5px 0; border-bottom: 1px dashed #eee;">• ${item?.name}</li>`;
+                    return `<li style="padding: 8px 0; border-bottom: 1px solid #eee; font-size: 1.1em;">• ${item?.name}</li>`;
                   }).join('')}
                 </ul>
               </div>
             `;
           }).join('')}
         </div>
+        <div style="margin-top: 50px; text-align: center; font-size: 0.8em; color: #888;">הופק על ידי מערכת הניהול - קייטרינג הדרן</div>
       </div>
     `;
 
@@ -119,14 +138,14 @@ const AdminDashboard: React.FC = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center p-32 gap-4">
              <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin"></div>
-             <p className="text-neutral-400 font-medium">טוען נתונים...</p>
+             <p className="text-neutral-400 font-medium">טוען נתונים מהענן...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-32 text-center">
             <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-6 text-neutral-300">
               <i className="fa-solid fa-folder-open text-3xl"></i>
             </div>
-            <p className="text-neutral-400 font-medium">אין כרגע בקשות להצגה</p>
+            <p className="text-neutral-400 font-medium">אין כרגע בקשות להצגה בלשונית זו</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -182,10 +201,10 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex justify-end gap-3">
                         {req.status === OrderStatus.PENDING && (
                           <button 
-                            onClick={() => handleApprove(req)}
+                            onClick={() => handleApproveClick(req)}
                             className="bg-gold hover:bg-yellow-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2"
                           >
-                            <i className="fa-solid fa-paper-plane"></i> אשר ושלח לינק
+                            <i className="fa-solid fa-envelope"></i> אשר ושלח הזמנה
                           </button>
                         )}
                         {req.status === OrderStatus.COMPLETED && (
@@ -201,11 +220,11 @@ const AdminDashboard: React.FC = () => {
                             onClick={() => {
                               const link = `${window.location.origin}/#/order/${req.id}`;
                               navigator.clipboard.writeText(link);
-                              alert('הלינק הועתק!');
+                              alert('הלינק האישי הועתק ללוח!');
                             }}
-                            className="text-slate-500 hover:text-gold text-xs font-bold flex items-center gap-1"
+                            className="text-slate-500 hover:text-gold text-xs font-bold flex items-center gap-1 bg-white border border-neutral-200 px-4 py-2 rounded-xl transition-all"
                           >
-                            <i className="fa-solid fa-copy"></i> העתק לינק
+                            <i className="fa-solid fa-link"></i> העתק לינק שוב
                           </button>
                         )}
                       </div>
@@ -218,12 +237,12 @@ const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Email Simulation Modal */}
+      {/* Email Confirmation Modal */}
       {showEmailModal.show && showEmailModal.request && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10">
             <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-slate-50">
-              <h3 className="text-xl font-serif font-bold text-slate-900">תצוגה מקדימה של הודעת האישור</h3>
+              <h3 className="text-xl font-serif font-bold text-slate-900">אישור ושליחת תפריט לבחירה</h3>
               <button onClick={() => setShowEmailModal({show: false})} className="text-neutral-400 hover:text-slate-900 transition-colors">
                 <i className="fa-solid fa-xmark text-xl"></i>
               </button>
@@ -233,32 +252,29 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-center mb-6">
                    <span className="text-2xl font-serif font-bold text-slate-900">קייטרינג <span className="text-gold">הדרן</span></span>
                 </div>
-                <p className="text-lg">שלום <strong>{showEmailModal.request.customerName}</strong>,</p>
-                <p className="leading-relaxed">
-                  שמחים לבשר לך שהתאריך שביקשת, <strong>{new Date(showEmailModal.request.eventDate).toLocaleDateString('he-IL')}</strong>, זמין עבור האירוע שלכם ב-<strong>{showEmailModal.request.location}</strong>.
-                </p>
-                <p className="leading-relaxed">
-                  כדי שנוכל להתקדם, אנא היכנסו ללינק האישי שלכם ובחרו את המנות המועדפות עליכם מתוך התפריט:
-                </p>
-                <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-gold text-center">
-                  <span className="text-gold font-mono text-sm break-all">
-                    {window.location.origin}/#/order/{showEmailModal.request.id}
-                  </span>
+                <p className="text-lg">הודעה ל-<strong>{showEmailModal.request.customerName}</strong> ({showEmailModal.request.email}):</p>
+                <div className="bg-slate-50 p-6 rounded-xl border-r-4 border-gold text-sm text-slate-700 leading-relaxed">
+                  שלום {showEmailModal.request.customerName}, שמחים לבשר לך שהתאריך שביקשת ({new Date(showEmailModal.request.eventDate).toLocaleDateString('he-IL')}) זמין עבור האירוע ב-{showEmailModal.request.location}. 
+                  אנא היכנס לקישור הבא לבחירת המנות:
+                  <div className="mt-4 text-gold font-bold">{window.location.origin}/#/order/{showEmailModal.request.id}</div>
                 </div>
-                <p className="text-sm text-neutral-500">
-                  לאחר שתסיימו את הבחירה, המערכת תעדכן אותנו אוטומטית ונציג מטעמנו ייצור איתכם קשר לסגירה סופית.
-                </p>
-                <p className="font-serif italic text-gold">בברכה, צוות קייטרינג הדרן.</p>
+                <p className="text-xs text-neutral-400 mt-4 italic">* המייל יישלח באמצעות שירות EmailJS המחובר לחשבון המנהל.</p>
               </div>
             </div>
             <div className="p-6 border-t border-neutral-100 flex gap-4">
               <button 
-                onClick={() => confirmApproval(showEmailModal.request!.id)}
-                className="flex-grow bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl shadow-lg transition-all"
+                disabled={sendingEmail}
+                onClick={() => confirmApprovalAndSendEmail(showEmailModal.request!)}
+                className="flex-grow bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-3"
               >
-                אישור ושליחה ללקוח
+                {sendingEmail ? (
+                  <><i className="fa-solid fa-spinner animate-spin"></i> שולח מייל...</>
+                ) : (
+                  <><i className="fa-solid fa-paper-plane"></i> אישור ושליחת מייל</>
+                )}
               </button>
               <button 
+                disabled={sendingEmail}
                 onClick={() => setShowEmailModal({show: false})}
                 className="px-8 border border-neutral-200 text-neutral-500 font-bold rounded-2xl hover:bg-neutral-50 transition-all"
               >
