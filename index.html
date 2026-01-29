@@ -4,29 +4,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>אבחון מערכת הדרן</title>
+    <title>קייטרינג הדרן - יוקרה קולינרית</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;400;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     
     <script>
-      window.process = { 
-        env: { 
-          SUPABASE_URL: "", 
-          SUPABASE_ANON_KEY: "",
-          EMAILJS_PUBLIC_KEY: "" 
-        } 
-      };
-      
+      // Global Error Catcher for White Screen Debugging
       window.onerror = function(msg, url, line, col, error) {
-        console.error("CRITICAL:", msg);
         const root = document.getElementById('root');
         if (root) {
-          root.innerHTML = `<div style="padding:20px; color:red; font-family:sans-serif;">
-            <h2>שגיאת טעינה קריטית</h2>
-            <p>${msg}</p>
-            <small>${url}:${line}</small>
-          </div>`;
+          root.innerHTML = `
+            <div style="padding: 40px; font-family: sans-serif; text-align: center; direction: rtl; background: #fff5f5; height: 100vh;">
+              <h2 style="color: #e11d48; font-size: 24px;">אופס! קרתה שגיאה בטעינה</h2>
+              <p style="color: #666; margin: 10px 0;">האפליקציה לא הצליחה לעלות. הנה הפרטים הטכניים:</p>
+              <div style="background: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; text-align: left; direction: ltr; font-family: monospace; font-size: 13px; margin: 20px auto; max-width: 800px; overflow: auto;">
+                <strong>Error:</strong> ${msg}<br>
+                <strong>File:</strong> ${url}<br>
+                <strong>Line:</strong> ${line}
+              </div>
+              <button onclick="location.reload()" style="background: #0f172a; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px;">נסה לטעון מחדש</button>
+            </div>
+          `;
         }
+        return false;
+      };
+
+      // Mock process.env for safe access
+      window.process = { 
+        env: { 
+          API_KEY: "",
+          SUPABASE_URL: "",
+          SUPABASE_ANON_KEY: ""
+        } 
       };
     </script>
 
@@ -36,25 +50,33 @@
     "react": "https://esm.sh/react@19.0.0",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.5",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0"
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
+
     <style>
-      body { font-family: 'Assistant', sans-serif; background: #f1f5f9; }
+      body { font-family: 'Assistant', sans-serif; background-color: #fafafa; margin: 0; }
+      .font-serif { font-family: 'Playfair Display', serif; }
+      .text-gold { color: #d4af37; }
+      .bg-gold { background-color: #d4af37; }
+      .dish-hotspot { position: absolute; cursor: pointer; background: rgba(212, 175, 55, 0.05); border: 1px solid transparent; transition: all 0.2s; z-index: 10; border-radius: 4px; }
+      .dish-hotspot:hover { background: rgba(212, 175, 55, 0.2); border-color: #d4af37; }
+      .dish-hotspot.selected { background: rgba(212, 175, 55, 0.4); border-color: #d4af37; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); z-index: 20; }
+      .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="h-screen flex items-center justify-center">
-        <div class="text-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p class="mt-4 text-slate-600">מריץ בדיקת מערכות...</p>
-        </div>
+      <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #d4af37; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 20px; color: #64748b; font-weight: 500;">מנטרל שגיאות וטוען מערכת...</p>
       </div>
     </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
   </body>
 </html>
