@@ -9,67 +9,41 @@
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <style>
-      body {
-        font-family: 'Assistant', sans-serif;
-        background-color: #fafafa;
-      }
-      .font-serif {
-        font-family: 'Playfair Display', serif;
-      }
+      body { font-family: 'Assistant', sans-serif; background-color: #fafafa; margin: 0; }
+      .font-serif { font-family: 'Playfair Display', serif; }
       .text-gold { color: #d4af37; }
       .bg-gold { background-color: #d4af37; }
-      .border-gold { border-color: #d4af37; }
       .animate-fade-in { animation: fadeIn 0.5s ease-out; }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      
-      /* Visual Menu Builder Styles */
-      .dish-hotspot {
-        position: absolute;
-        cursor: pointer;
-        background: rgba(212, 175, 55, 0.1);
-        border: 1px solid transparent;
-        transition: all 0.2s;
-      }
-      .dish-hotspot:hover {
-        background: rgba(212, 175, 55, 0.25);
-      }
-      .dish-hotspot.selected {
-        background: rgba(212, 175, 55, 0.4);
-        border-color: #d4af37;
-        box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-      }
+      .dish-hotspot { position: absolute; cursor: pointer; background: rgba(212, 175, 55, 0.1); border: 1px solid transparent; transition: all 0.2s; }
+      .dish-hotspot:hover { background: rgba(212, 175, 55, 0.25); }
+      .dish-hotspot.selected { background: rgba(212, 175, 55, 0.4); border-color: #d4af37; box-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
       .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
       .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
     </style>
     <script>
-      // Robust polyfill for environment variables
-      window.process = window.process || {};
-      window.process.env = {
-        SUPABASE_URL: window.localStorage.getItem('SUPABASE_URL') || "",
-        SUPABASE_ANON_KEY: window.localStorage.getItem('SUPABASE_ANON_KEY') || "",
-        EMAILJS_SERVICE_ID: "",
-        EMAILJS_TEMPLATE_ID: "",
-        EMAILJS_PUBLIC_KEY: "",
-        ...(window.process.env || {})
+      window.process = { 
+        env: { 
+          SUPABASE_URL: window.localStorage.getItem('SUPABASE_URL') || "",
+          SUPABASE_ANON_KEY: window.localStorage.getItem('SUPABASE_ANON_KEY') || ""
+        } 
       };
     </script>
     <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react/": "https://esm.sh/react@19.0.0/",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-        "react-router-dom": "https://esm.sh/react-router-dom@7.1.5",
-        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.5",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
   </head>
   <body>
     <div id="root"></div>
-    <!-- No manual script tag here - it is automatically managed by the platform -->
   </body>
 </html>
