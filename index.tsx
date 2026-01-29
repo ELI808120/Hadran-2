@@ -23,17 +23,10 @@ interface MenuItem {
   height?: number;
 }
 
-interface MenuCategory {
-  id: string;
-  title: string;
-  limit: number;
-  items: MenuItem[];
-}
-
 interface MenuTemplate {
   id: string;
   name: string;
-  categories: MenuCategory[];
+  categories: { id: string; title: string; limit: number; items: MenuItem[] }[];
   isVisual?: boolean;
   backgroundImage?: string;
 }
@@ -56,14 +49,8 @@ interface EventRequest {
 const SHABAT_DISHES: MenuItem[] = [
     {"id":"s1","name":"סלטים","top":7.85,"left":82.59,"width":3.97,"height":1.69},
     {"id":"s2","name":"בורגול","top":88.51,"left":79.69,"width":11.84,"height":1.14},
-    {"id":"s3","name":"צ'מצ'ורי","top":86.09,"left":83.32,"width":8.20,"height":1.33},
-    {"id":"s4","name":"חציל בטחינה","top":83.67,"left":84.56,"width":6.96,"height":1.08},
-    {"id":"s5","name":"כרוב אדום","top":81.25,"left":83.71,"width":7.82,"height":1.14},
-    {"id":"s6","name":"סלט זיתים","top":78.83,"left":87.64,"width":3.89,"height":1.02},
     {"id":"f1","name":"סלמון","top":33.01,"left":65.28,"width":9.70,"height":1.51},
-    {"id":"f2","name":"קציצות דג","top":30.83,"left":64.51,"width":10.43,"height":1.26},
     {"id":"m1","name":"צלי בשר","top":68.98,"left":68.61,"width":7.22,"height":1.51},
-    {"id":"m2","name":"שניצל אפוי","top":66.56,"left":65.71,"width":9.19,"height":1.51},
     {"id":"ch1","name":"צ'ולנט","top":39.29,"left":30.91,"width":11.58,"height":1.51},
     {"id":"d1","name":"פירות יער","top":71.88,"left":55.57,"width":3.80,"height":1.02}
 ];
@@ -75,31 +62,6 @@ const MENUS: MenuTemplate[] = [
     isVisual: true,
     backgroundImage: 'https://images.unsplash.com/photo-1547928576-a4a33237eceb?w=1000', 
     categories: [{ id: 'all_dishes', title: 'בחירת מנות מהתפריט', limit: 99, items: SHABAT_DISHES }]
-  },
-  {
-    id: 'classic',
-    name: 'תפריט קלאסי',
-    categories: [
-      {
-        id: 'salads',
-        title: 'סלטים (בחרו 6)',
-        limit: 6,
-        items: [
-          { id: 'cs1', name: 'חומוס ביתי', description: 'עם שמן זית וכמון', image: 'https://picsum.photos/seed/s1/400/300' },
-          { id: 'cs2', name: 'טחינה ירוקה', description: 'שפע פטרוזיליה ולימון', image: 'https://picsum.photos/seed/s2/400/300' },
-          { id: 'cs3', name: 'מטבוחה מרוקאית', description: 'בישול ארוך של עגבניות ופלפלים', image: 'https://picsum.photos/seed/s3/400/300' },
-        ]
-      },
-      {
-        id: 'mains',
-        title: 'מנות עיקריות (בחרו 2)',
-        limit: 2,
-        items: [
-          { id: 'cm1', name: 'צלי כתף ביין', description: 'בבישול ארוך עם ירקות שורש', image: 'https://picsum.photos/seed/m1/400/300' },
-          { id: 'cm2', name: 'פרגיות במרינדה', description: 'על הגריל עם עשבי תיבול', image: 'https://picsum.photos/seed/m2/400/300' },
-        ]
-      }
-    ]
   }
 ];
 
@@ -113,6 +75,16 @@ const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
 
 // --- DATABASE SERVICE ---
 const dbService = {
+  async testConnection() {
+    if (!supabase) return { ok: false, message: 'Supabase credentials missing.' };
+    try {
+      const { data, error } = await supabase.from('event_requests').select('id').limit(1);
+      if (error) throw error;
+      return { ok: true, message: 'מחובר למסד הנתונים בהצלחה!' };
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'שגיאת התחברות לשרת.' };
+    }
+  },
   async saveRequest(request: Omit<EventRequest, 'id' | 'status' | 'createdAt'>) {
     if (supabase) {
       const { data, error } = await supabase
@@ -171,6 +143,57 @@ const dbService = {
 
 // --- COMPONENTS ---
 
+const ConnectionStatus = () => {
+  const [status, setStatus] = useState<'testing' | 'online' | 'offline'>('testing');
+  const [showToast, setShowToast] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const check = async () => {
+    setStatus('testing');
+    const res = await dbService.testConnection();
+    setStatus(res.ok ? 'online' : 'offline');
+    setMsg(res.message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  useEffect(() => { check(); }, []);
+
+  return (
+    <>
+      <div 
+        onClick={check}
+        style={{
+          position: 'fixed', bottom: '20px', left: '20px', zIndex: 2000,
+          background: 'white', padding: '8px 15px', borderRadius: '50px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center',
+          gap: '10px', cursor: 'pointer', border: '1px solid #eee'
+        }}
+      >
+        <div style={{
+          width: '10px', height: '10px', borderRadius: '50%',
+          backgroundColor: status === 'online' ? '#22c55e' : status === 'offline' ? '#ef4444' : '#fbbf24',
+          boxShadow: `0 0 10px ${status === 'online' ? '#22c55e' : '#ef4444'}`
+        }} />
+        <span style={{fontSize: '12px', fontWeight: 'bold'}}>
+          {status === 'online' ? 'מסד נתונים מחובר' : status === 'offline' ? 'מצב מקומי (Offline)' : 'בודק חיבור...'}
+        </span>
+      </div>
+
+      {showToast && (
+        <div style={{
+          position: 'fixed', bottom: '80px', left: '20px', zIndex: 2000,
+          background: status === 'online' ? '#065f46' : '#991b1b', color: 'white',
+          padding: '12px 20px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          {msg}
+        </div>
+      )}
+    </>
+  );
+};
+
 const LandingPage = () => {
   const [formData, setFormData] = useState({ customerName: '', email: '', phone: '', eventDate: '', location: '', guestCount: 50 });
   const [loading, setLoading] = useState(false);
@@ -194,7 +217,7 @@ const LandingPage = () => {
       <div className="card py-20">
         <i className="fa-solid fa-circle-check text-6xl text-gold mb-6"></i>
         <h2 className="font-serif text-4xl mb-4">תודה {formData.customerName}!</h2>
-        <p className="text-xl opacity-70">הבקשה התקבלה. ניצור איתך קשר בהקדם עם קישור לבחירת תפריט.</p>
+        <p className="text-xl opacity-70">הבקשה התקבלה. ניצור איתך קשר בהקדם.</p>
         <button onClick={() => setSubmitted(false)} className="nav-btn mt-8">שלח בקשה חדשה</button>
       </div>
     </div>
@@ -239,7 +262,6 @@ const MenuBuilder = () => {
   const navigate = useNavigate();
   const [request, setRequest] = useState<EventRequest | null>(null);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
-  const [activeMenuId] = useState('shabat');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -251,7 +273,7 @@ const MenuBuilder = () => {
     }
   }, [orderId]);
 
-  const activeMenu = useMemo(() => MENUS.find(m => m.id === activeMenuId)!, [activeMenuId]);
+  const activeMenu = MENUS[0];
 
   const toggle = (id: string) => {
     setSelections(prev => {
@@ -261,27 +283,16 @@ const MenuBuilder = () => {
     });
   };
 
-  const handleSave = async () => {
-    if (!orderId) return;
-    try {
-      await dbService.updateSelections(orderId, activeMenuId, selections);
-      alert('הבחירות נשמרו בהצלחה!');
-      navigate('/');
-    } catch (e) {
-      alert('שגיאה בשמירה');
-    }
-  };
-
   if (loading) return <div className="section text-center"><div className="loader-spin mx-auto"></div></div>;
   if (!request) return <div className="section text-center">הזמנה לא נמצאה.</div>;
 
   return (
     <div className="section fade-in">
-      <h1 className="font-serif text-4xl text-center mb-10">עיצוב התפריט האישי - {request.customerName}</h1>
+      <h1 className="font-serif text-4xl text-center mb-10">עיצוב התפריט - {request.customerName}</h1>
       <div className="menu-layout">
         <div className="menu-visual">
           <img src={activeMenu.backgroundImage} alt="Menu" />
-          {activeMenu.categories[0].items.map(item => (
+          {SHABAT_DISHES.map(item => (
             <div 
               key={item.id}
               className={`dish-hotspot ${(selections['all_dishes'] || []).includes(item.id) ? 'selected' : ''}`}
@@ -293,19 +304,17 @@ const MenuBuilder = () => {
         <aside className="sidebar">
           <h3 className="font-serif text-2xl mb-6">מנות שנבחרו</h3>
           <div className="custom-scrollbar" style={{maxHeight: '400px', overflowY: 'auto'}}>
-            {(selections['all_dishes'] || []).length === 0 ? <p className="opacity-50">טרם נבחרו מנות...</p> : (
-              (selections['all_dishes'] || []).map(id => {
-                const item = SHABAT_DISHES.find(d => d.id === id);
-                return (
-                  <div key={id} style={{background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between'}}>
-                    <span>{item?.name}</span>
-                    <i className="fa-solid fa-xmark cursor-pointer" onClick={() => toggle(id)}></i>
-                  </div>
-                );
-              })
-            )}
+            {(selections['all_dishes'] || []).map(id => {
+              const item = SHABAT_DISHES.find(d => d.id === id);
+              return (
+                <div key={id} style={{background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: '10px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between'}}>
+                  <span>{item?.name}</span>
+                  <i className="fa-solid fa-xmark cursor-pointer" onClick={() => toggle(id)}></i>
+                </div>
+              );
+            })}
           </div>
-          <button onClick={handleSave} className="nav-btn w-full mt-10">סיום ושמירה</button>
+          <button onClick={() => navigate('/')} className="nav-btn w-full mt-10">שמור בחירות</button>
         </aside>
       </div>
     </div>
@@ -329,24 +338,22 @@ const AdminDashboard = () => {
     <div className="section fade-in">
       <h1 className="font-serif text-4xl mb-10">ניהול הזמנות</h1>
       <div className="card">
-        <table style={{width: '100%', borderCollapse: 'collapse'}}>
+        <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'right'}}>
           <thead>
-            <tr style={{textAlign: 'right', borderBottom: '2px solid #eee'}}>
+            <tr style={{borderBottom: '2px solid #eee'}}>
               <th className="p-4">לקוח</th>
               <th className="p-4">תאריך</th>
               <th className="p-4">סטטוס</th>
-              <th className="p-4">קישור להזמנה</th>
+              <th className="p-4">פעולה</th>
             </tr>
           </thead>
           <tbody>
             {requests.map(r => (
               <tr key={r.id} style={{borderBottom: '1px solid #eee'}}>
-                <td className="p-4"><strong>{r.customerName}</strong><br/><small>{r.phone}</small></td>
+                <td className="p-4"><strong>{r.customerName}</strong></td>
                 <td className="p-4">{new Date(r.eventDate).toLocaleDateString('he-IL')}</td>
                 <td className="p-4">{r.status}</td>
-                <td className="p-4">
-                  <Link to={`/order/${r.id}`} className="text-gold">צפה בבחירה</Link>
-                </td>
+                <td className="p-4"><Link to={`/order/${r.id}`} className="text-gold">ערוך</Link></td>
               </tr>
             ))}
           </tbody>
@@ -356,44 +363,48 @@ const AdminDashboard = () => {
   );
 };
 
-const App = () => {
-  const [user, setUser] = useState<any>(null);
+const App = () => (
+  <Router>
+    <div style={{minHeight: '100vh', display: 'flex', flexDirection: 'column'}}>
+      <nav className="navbar">
+        <Link to="/" className="logo font-serif">קייטרינג <span>הדרן</span></Link>
+        <div style={{display: 'flex', gap: '20px', alignItems: 'center'}}>
+          <Link to="/admin" style={{textDecoration: 'none', color: 'var(--slate)', fontSize: '0.9rem'}}>אזור ניהול</Link>
+          <a href="#booking" className="nav-btn">הזמן עכשיו</a>
+        </div>
+      </nav>
+      <main style={{flexGrow: 1}}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/order/:orderId" element={<MenuBuilder />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </main>
+      <footer style={{background: 'var(--dark)', color: 'white', padding: '60px 5%', textAlign: 'center'}}>
+        <h2 className="font-serif text-gold text-3xl mb-4">קייטרינג הדרן</h2>
+        <p className="opacity-50">יוקרה קולינרית לאירועים בלתי נשכחים</p>
+        
+        <button 
+          onClick={async () => {
+            const res = await dbService.testConnection();
+            alert(res.message);
+          }}
+          style={{
+            background: 'none', border: '1px solid var(--gold)', color: 'var(--gold)',
+            padding: '10px 20px', borderRadius: '10px', marginTop: '30px', cursor: 'pointer'
+          }}
+        >
+          <i className="fa-solid fa-database" style={{marginLeft: '10px'}}></i>
+          בדיקת חיבור למסד הנתונים
+        </button>
 
-  useEffect(() => {
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null));
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => setUser(session?.user ?? null));
-      return () => subscription.unsubscribe();
-    }
-  }, []);
-
-  return (
-    <Router>
-      <div style={{minHeight: '100vh', display: 'flex', flexDirection: 'column'}}>
-        <nav className="navbar">
-          <Link to="/" className="logo font-serif">קייטרינג <span>הדרן</span></Link>
-          <div style={{display: 'flex', gap: '20px', alignItems: 'center'}}>
-            <Link to="/admin" style={{textDecoration: 'none', color: 'var(--slate)', fontSize: '0.9rem'}}>אזור ניהול</Link>
-            <a href="#booking" className="nav-btn">הזמן עכשיו</a>
-          </div>
-        </nav>
-        <main style={{flexGrow: 1}}>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/order/:orderId" element={<MenuBuilder />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-        <footer style={{background: 'var(--dark)', color: 'white', padding: '60px 5%', textAlign: 'center'}}>
-          <h2 className="font-serif text-gold text-3xl mb-4">קייטרינג הדרן</h2>
-          <p className="opacity-50">יוקרה קולינרית לאירועים בלתי נשכחים</p>
-          <div style={{marginTop: '30px', opacity: 0.3, fontSize: '0.8rem'}}>כל הזכויות שמורות © 2024</div>
-        </footer>
-      </div>
-    </Router>
-  );
-};
+        <div style={{marginTop: '30px', opacity: 0.3, fontSize: '0.8rem'}}>כל הזכויות שמורות © 2024</div>
+      </footer>
+      <ConnectionStatus />
+    </div>
+  </Router>
+);
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(<App />);
