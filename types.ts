@@ -9,8 +9,13 @@ export enum OrderStatus {
 export interface MenuItem {
   id: string;
   name: string;
-  description: string;
-  image: string;
+  description?: string;
+  image?: string;
+  // Visual coordinates
+  top?: number;
+  left?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface MenuCategory {
@@ -24,6 +29,8 @@ export interface MenuTemplate {
   id: string;
   name: string;
   categories: MenuCategory[];
+  isVisual?: boolean;
+  backgroundImage?: string;
 }
 
 export interface EventRequest {
@@ -32,12 +39,12 @@ export interface EventRequest {
   email: string;
   phone: string;
   eventDate: string;
-  location: string; // New field
+  location: string;
   guestCount: number;
   status: OrderStatus;
   createdAt: string;
   selectedMenuId?: string;
-  selections?: Record<string, string[]>; // categoryId -> [itemIds]
+  selections?: Record<string, string[]>; 
 }
 
 export interface Testimonial {
