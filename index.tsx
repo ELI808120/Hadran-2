@@ -5,12 +5,10 @@ import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate, Navi
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * קייטרינג הדרן - גרסה 2.0 משופרת
- * כוללת ניהול מסד נתונים היברידי, תפריט ויזואלי מלא ועיצוב פרימיום.
+ * קייטרינג הדרן - גרסה 2.5 (Diagnostic Edition)
  */
 
 // --- CONFIG & ENV ---
-// ניסיון גישה למשתנים בכמה דרכים כדי להבטיח חיבור
 const getEnv = (key: string) => {
   return (window as any).process?.env?.[key] || (process as any).env?.[key] || '';
 };
@@ -18,11 +16,12 @@ const getEnv = (key: string) => {
 const SUPABASE_URL = getEnv('SUPABASE_URL');
 const SUPABASE_ANON_KEY = getEnv('SUPABASE_ANON_KEY');
 
+// יצירת קליינט רק אם יש נתונים
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http')) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// --- DATA: ALL 93 DISHES FROM CONSTANTS ---
+// --- DATA: ALL 93 DISHES ---
 const SHABAT_DISHES = [
     {"id":"s1","name":"סלטים","top":7.85,"left":82.59,"width":3.97,"height":1.69},
     {"id":"s2","name":"בורגול","top":88.51,"left":79.69,"width":11.84,"height":1.14},
@@ -117,15 +116,15 @@ const SHABAT_DISHES = [
 
 // --- DATABASE SERVICE ---
 const db = {
-  async test() {
-    if (!supabase) return { ok: false, msg: 'מפתח חסר (סביבה מוגבלת)' };
+  async testConnection() {
+    if (!supabase) return { ok: false, msg: 'מפתחות Supabase חסרים בקובץ הסביבה' };
     try {
-      // בדיקה ע"י שאילתה פשוטה
-      const { error } = await supabase.from('event_requests').select('id').limit(1);
+      const { error } = await supabase.from('event_requests').select('count', { count: 'exact', head: true });
       if (error) throw error;
-      return { ok: true, msg: 'מחובר ל-Supabase' };
+      return { ok: true, msg: 'החיבור לשרת תקין!' };
     } catch (e: any) {
-      return { ok: false, msg: 'שגיאת התחברות לשרת' };
+      console.error('Connection test failed:', e);
+      return { ok: false, msg: e.message || 'שגיאת רשת לא ידועה' };
     }
   },
   async saveRequest(data: any) {
@@ -171,35 +170,91 @@ const db = {
 
 // --- COMPONENTS ---
 
-const StatusIndicator = () => {
-  const [status, setStatus] = useState<'testing' | 'online' | 'offline'>('testing');
+const DiagnosticPanel = () => {
+  const [status, setStatus] = useState<'pending' | 'online' | 'offline'>('pending');
+  const [msg, setMsg] = useState('ממתין לבדיקה...');
   const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    db.test().then(res => setStatus(res.ok ? 'online' : 'offline'));
-  }, []);
+  const runTest = async () => {
+    setLoading(true);
+    setStatus('pending');
+    setMsg('מריץ שאילתה מול השרת...');
+    const result = await db.testConnection();
+    setStatus(result.ok ? 'online' : 'offline');
+    setMsg(result.msg);
+    setLoading(false);
+  };
+
+  useEffect(() => { runTest(); }, []);
 
   return (
-    <div 
-      onClick={() => setExpanded(!expanded)}
-      style={{
-        position: 'fixed', bottom: '20px', left: '20px', zIndex: 3000,
-        background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)',
-        padding: expanded ? '15px 25px' : '10px', borderRadius: expanded ? '20px' : '50%',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.15)', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        border: '1px solid rgba(0,0,0,0.05)'
-      }}
-    >
-      <div style={{
-        width: '12px', height: '12px', borderRadius: '50%',
-        backgroundColor: status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b',
-        boxShadow: `0 0 15px ${status === 'online' ? '#10b981' : '#ef4444'}`
-      }} />
+    <div style={{
+      position: 'fixed', bottom: '20px', left: '20px', zIndex: 9999,
+      fontFamily: 'Assistant, sans-serif', direction: 'rtl'
+    }}>
+      {/* הבועה הקטנה */}
+      <div 
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width: '50px', height: '50px', borderRadius: '50%',
+          background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.15)', cursor: 'pointer',
+          border: '2px solid transparent', 
+          borderColor: status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b',
+          transition: 'transform 0.3s'
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+      >
+        <i className={`fa-solid ${status === 'online' ? 'fa-cloud' : 'fa-triangle-exclamation'}`} style={{
+          color: status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b',
+          fontSize: '20px'
+        }}></i>
+      </div>
+
+      {/* הפאנל המורחב */}
       {expanded && (
-        <div style={{fontSize: '13px', fontWeight: 600}}>
-          {status === 'online' ? 'מסד נתונים בענן פעיל' : 'מצב עבודה מקומי (Local)'}
-          <div style={{fontSize: '11px', opacity: 0.6, marginTop: '2px'}}>לחצו לסגירה</div>
+        <div className="fade-in" style={{
+          position: 'absolute', bottom: '60px', left: '0', width: '300px',
+          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)',
+          borderRadius: '24px', padding: '25px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+          border: '1px solid rgba(0,0,0,0.05)'
+        }}>
+          <h4 style={{margin: '0 0 15px 0', fontSize: '18px', fontWeight: 800}}>דיאגנוסטיקת חיבור</h4>
+          
+          <div style={{fontSize: '14px', marginBottom: '20px'}}>
+             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
+                <span>מצב נוכחי:</span>
+                <b style={{color: status === 'online' ? '#10b981' : '#ef4444'}}>
+                   {status === 'online' ? 'מחובר לענן' : status === 'offline' ? 'מצב מקומי' : 'בבדיקה...'}
+                </b>
+             </div>
+             <div style={{background: '#f8fafc', padding: '10px', borderRadius: '12px', fontSize: '12px', border: '1px solid #eee', minHeight: '40px'}}>
+                {msg}
+             </div>
+          </div>
+
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+             <button 
+                onClick={runTest}
+                disabled={loading}
+                style={{
+                  padding: '12px', borderRadius: '12px', border: 'none',
+                  background: 'var(--dark)', color: 'white', fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+             >
+                {loading ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-vial"></i>}
+                בצע בדיקת תקשורת עכשיו
+             </button>
+             <button 
+                onClick={() => setExpanded(false)}
+                style={{background: 'transparent', border: 'none', color: '#64748b', fontSize: '12px', cursor: 'pointer'}}
+             >
+                סגור פאנל
+             </button>
+          </div>
         </div>
       )}
     </div>
@@ -464,7 +519,6 @@ const App = () => (
                 מטבח המהדרין שלנו משלב חומרי גלם משובחים עם הגשה עוצרת נשימה.
             </p>
             <div style={{display: 'flex', justifyContent: 'center', gap: '40px', fontSize: '30px', marginBottom: '50px'}}>
-              {/* Fix: Merged duplicate className attributes on social icons */}
               <i className="fa-brands fa-instagram social-icon" style={{cursor: 'pointer', transition: '0.3s'}}></i>
               <i className="fa-brands fa-whatsapp social-icon" style={{cursor: 'pointer', transition: '0.3s'}}></i>
               <i className="fa-solid fa-phone social-icon" style={{cursor: 'pointer', transition: '0.3s'}}></i>
@@ -472,7 +526,7 @@ const App = () => (
             <div style={{opacity: 0.3, fontSize: '13px', paddingTop: '40px', borderTop: '1px solid rgba(255,255,255,0.05)'}}>כל הזכויות שמורות © 2024 קייטרינג הדרן - יוקרה קולינרית בכשרות מהדרין</div>
         </div>
       </footer>
-      <StatusIndicator />
+      <DiagnosticPanel />
     </div>
   </Router>
 );
