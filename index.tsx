@@ -5,18 +5,21 @@ import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate, Navi
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * קייטרינג הדרן - גרסה 2.5 (Diagnostic Edition)
+ * קייטרינג הדרן - גרסה 2.6 (Expert Diagnostic Edition)
  */
 
 // --- CONFIG & ENV ---
 const getEnv = (key: string) => {
-  return (window as any).process?.env?.[key] || (process as any).env?.[key] || '';
+  const val = (window as any).process?.env?.[key] || (process as any).env?.[key] || '';
+  return val.trim();
 };
 
 const SUPABASE_URL = getEnv('SUPABASE_URL');
 const SUPABASE_ANON_KEY = getEnv('SUPABASE_ANON_KEY');
+const EMAILJS_SERVICE_ID = getEnv('EMAILJS_SERVICE_ID');
+const EMAILJS_TEMPLATE_ID = getEnv('EMAILJS_TEMPLATE_ID');
+const EMAILJS_PUBLIC_KEY = getEnv('EMAILJS_PUBLIC_KEY');
 
-// יצירת קליינט רק אם יש נתונים
 const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http')) 
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
@@ -116,16 +119,71 @@ const SHABAT_DISHES = [
 
 // --- DATABASE SERVICE ---
 const db = {
-  async testConnection() {
-    if (!supabase) return { ok: false, msg: 'מפתחות Supabase חסרים בקובץ הסביבה' };
-    try {
-      const { error } = await supabase.from('event_requests').select('count', { count: 'exact', head: true });
-      if (error) throw error;
-      return { ok: true, msg: 'החיבור לשרת תקין!' };
-    } catch (e: any) {
-      console.error('Connection test failed:', e);
-      return { ok: false, msg: e.message || 'שגיאת רשת לא ידועה' };
+  async runDetailedDiagnostics() {
+    const report: any = {
+      supabaseUrl: { val: SUPABASE_URL, status: 'pending', note: '' },
+      supabaseKey: { val: SUPABASE_ANON_KEY, status: 'pending', note: '' },
+      clientInit: { status: 'pending', note: '' },
+      databaseAccess: { status: 'pending', note: '' },
+      emailJs: { status: 'pending', note: '' }
+    };
+
+    // 1. Check URL
+    if (!SUPABASE_URL) {
+      report.supabaseUrl.status = 'fail';
+      report.supabaseUrl.note = 'חסר SUPABASE_URL במשתני הסביבה';
+    } else if (!SUPABASE_URL.startsWith('https://')) {
+      report.supabaseUrl.status = 'fail';
+      report.supabaseUrl.note = 'כתובת URL לא תקינה (חייבת להתחיל ב-https)';
+    } else {
+      report.supabaseUrl.status = 'pass';
     }
+
+    // 2. Check Key
+    if (!SUPABASE_ANON_KEY) {
+      report.supabaseKey.status = 'fail';
+      report.supabaseKey.note = 'חסר SUPABASE_ANON_KEY במשתני הסביבה';
+    } else if (SUPABASE_ANON_KEY.length < 50) {
+      report.supabaseKey.status = 'warning';
+      report.supabaseKey.note = 'המפתח נראה קצר מדי, בדוק שוב';
+    } else {
+      report.supabaseKey.status = 'pass';
+    }
+
+    // 3. Client Init
+    if (supabase) {
+      report.clientInit.status = 'pass';
+    } else {
+      report.clientInit.status = 'fail';
+      report.clientInit.note = 'לא ניתן לאתחל את ה-Supabase Client עקב נתונים חסרים';
+    }
+
+    // 4. Actual DB Ping
+    if (supabase) {
+      try {
+        const { error } = await supabase.from('event_requests').select('count', { count: 'exact', head: true });
+        if (error) {
+          report.databaseAccess.status = 'fail';
+          report.databaseAccess.note = `שגיאת Supabase: ${error.message}. וודא שהטבלה event_requests קיימת ושיש לה RLS מאושר.`;
+        } else {
+          report.databaseAccess.status = 'pass';
+          report.databaseAccess.note = 'החיבור לטבלה עובד מצוין!';
+        }
+      } catch (e: any) {
+        report.databaseAccess.status = 'fail';
+        report.databaseAccess.note = `שגיאת רשת: ${e.message}`;
+      }
+    }
+
+    // 5. EmailJS Check
+    if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+      report.emailJs.status = 'pass';
+    } else {
+      report.emailJs.status = 'warning';
+      report.emailJs.note = 'חלק ממשתני ה-EmailJS חסרים. המיילים לא יישלחו.';
+    }
+
+    return report;
   },
   async saveRequest(data: any) {
     if (supabase) {
@@ -171,22 +229,27 @@ const db = {
 // --- COMPONENTS ---
 
 const DiagnosticPanel = () => {
-  const [status, setStatus] = useState<'pending' | 'online' | 'offline'>('pending');
-  const [msg, setMsg] = useState('ממתין לבדיקה...');
+  const [report, setReport] = useState<any>(null);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const runTest = async () => {
+  const runDiagnostics = async () => {
     setLoading(true);
-    setStatus('pending');
-    setMsg('מריץ שאילתה מול השרת...');
-    const result = await db.testConnection();
-    setStatus(result.ok ? 'online' : 'offline');
-    setMsg(result.msg);
+    const res = await db.runDetailedDiagnostics();
+    setReport(res);
     setLoading(false);
   };
 
-  useEffect(() => { runTest(); }, []);
+  useEffect(() => { runDiagnostics(); }, []);
+
+  const getIcon = (status: string) => {
+    if (status === 'pass') return <i className="fa-solid fa-circle-check" style={{color: '#10b981'}}></i>;
+    if (status === 'fail') return <i className="fa-solid fa-circle-xmark" style={{color: '#ef4444'}}></i>;
+    if (status === 'warning') return <i className="fa-solid fa-circle-exclamation" style={{color: '#f59e0b'}}></i>;
+    return <i className="fa-solid fa-circle-notch animate-spin" style={{color: '#94a3b8'}}></i>;
+  };
+
+  const isAllPass = report && Object.values(report).every((r: any) => r.status === 'pass');
 
   return (
     <div style={{
@@ -197,69 +260,108 @@ const DiagnosticPanel = () => {
       <div 
         onClick={() => setExpanded(!expanded)}
         style={{
-          width: '50px', height: '50px', borderRadius: '50%',
+          width: '55px', height: '55px', borderRadius: '50%',
           background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.15)', cursor: 'pointer',
-          border: '2px solid transparent', 
-          borderColor: status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b',
-          transition: 'transform 0.3s'
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)', cursor: 'pointer',
+          border: '3px solid transparent', 
+          borderColor: isAllPass ? '#10b981' : '#ef4444',
+          transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15) rotate(15deg)'}
+        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
       >
-        <i className={`fa-solid ${status === 'online' ? 'fa-cloud' : 'fa-triangle-exclamation'}`} style={{
-          color: status === 'online' ? '#10b981' : status === 'offline' ? '#ef4444' : '#f59e0b',
-          fontSize: '20px'
+        <i className={`fa-solid ${isAllPass ? 'fa-shield-check' : 'fa-stethoscope'}`} style={{
+          color: isAllPass ? '#10b981' : '#ef4444',
+          fontSize: '24px'
         }}></i>
       </div>
 
       {/* הפאנל המורחב */}
       {expanded && (
         <div className="fade-in" style={{
-          position: 'absolute', bottom: '60px', left: '0', width: '300px',
-          background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)',
-          borderRadius: '24px', padding: '25px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-          border: '1px solid rgba(0,0,0,0.05)'
+          position: 'absolute', bottom: '70px', left: '0', width: '380px',
+          background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)',
+          borderRadius: '28px', padding: '30px', boxShadow: '0 30px 100px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(0,0,0,0.08)', maxHeight: '80vh', overflowY: 'auto'
         }}>
-          <h4 style={{margin: '0 0 15px 0', fontSize: '18px', fontWeight: 800}}>דיאגנוסטיקת חיבור</h4>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px'}}>
+             <h4 style={{margin: 0, fontSize: '20px', fontWeight: 800}}>מרכז דיאגנוסטיקה</h4>
+             <button onClick={runDiagnostics} disabled={loading} style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gold)'}}>
+                <i className={`fa-solid fa-rotate ${loading ? 'animate-spin' : ''}`}></i>
+             </button>
+          </div>
           
-          <div style={{fontSize: '14px', marginBottom: '20px'}}>
-             <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
-                <span>מצב נוכחי:</span>
-                <b style={{color: status === 'online' ? '#10b981' : '#ef4444'}}>
-                   {status === 'online' ? 'מחובר לענן' : status === 'offline' ? 'מצב מקומי' : 'בבדיקה...'}
-                </b>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                   {getIcon(report?.supabaseUrl.status)}
+                   <div style={{fontSize: '14px'}}>
+                      <div style={{fontWeight: 700}}>כתובת Supabase URL</div>
+                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.supabaseUrl.note || 'הכתובת תקינה'}</div>
+                   </div>
+                </div>
              </div>
-             <div style={{background: '#f8fafc', padding: '10px', borderRadius: '12px', fontSize: '12px', border: '1px solid #eee', minHeight: '40px'}}>
-                {msg}
+
+             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                   {getIcon(report?.supabaseKey.status)}
+                   <div style={{fontSize: '14px'}}>
+                      <div style={{fontWeight: 700}}>מפתח API (Anon Key)</div>
+                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.supabaseKey.note || 'המפתח הוגדר'}</div>
+                   </div>
+                </div>
+             </div>
+
+             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                   {getIcon(report?.clientInit.status)}
+                   <div style={{fontSize: '14px'}}>
+                      <div style={{fontWeight: 700}}>אתחול Supabase Client</div>
+                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.clientInit.note || 'הקליינט מוכן לפעולה'}</div>
+                   </div>
+                </div>
+             </div>
+
+             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                   {getIcon(report?.databaseAccess.status)}
+                   <div style={{fontSize: '14px'}}>
+                      <div style={{fontWeight: 700}}>גישה לטבלה event_requests</div>
+                      <div style={{opacity: 0.8, fontSize: '12px', color: report?.databaseAccess.status === 'fail' ? '#ef4444' : 'inherit'}}>
+                        {report?.databaseAccess.note}
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div style={{paddingBottom: '10px'}}>
+                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                   {getIcon(report?.emailJs.status)}
+                   <div style={{fontSize: '14px'}}>
+                      <div style={{fontWeight: 700}}>שירות EmailJS</div>
+                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.emailJs.note || 'הגדרות המייל תקינות'}</div>
+                   </div>
+                </div>
              </div>
           </div>
 
-          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-             <button 
-                onClick={runTest}
-                disabled={loading}
-                style={{
-                  padding: '12px', borderRadius: '12px', border: 'none',
-                  background: 'var(--dark)', color: 'white', fontWeight: 700,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                }}
-             >
-                {loading ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-vial"></i>}
-                בצע בדיקת תקשורת עכשיו
-             </button>
-             <button 
-                onClick={() => setExpanded(false)}
-                style={{background: 'transparent', border: 'none', color: '#64748b', fontSize: '12px', cursor: 'pointer'}}
-             >
-                סגור פאנל
-             </button>
-          </div>
+          <button 
+            onClick={() => setExpanded(false)}
+            style={{
+              width: '100%', marginTop: '20px', padding: '15px', 
+              borderRadius: '15px', border: 'none', background: '#f1f5f9',
+              fontWeight: 700, cursor: 'pointer'
+            }}
+          >
+            הבנתי, סגור
+          </button>
         </div>
       )}
     </div>
   );
 };
+
+// --- VIEWS ---
 
 const Landing = () => {
   const [form, setForm] = useState({ customerName: '', phone: '', email: '', eventDate: '', location: '', guestCount: 50 });
