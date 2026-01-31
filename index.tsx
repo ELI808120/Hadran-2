@@ -5,12 +5,13 @@ import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate, Navi
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * קייטרינג הדרן - גרסה 2.6 (Expert Diagnostic Edition)
+ * קייטרינג הדרן - גרסה 2.7 (Deep Tracer Diagnostic)
  */
 
 // --- CONFIG & ENV ---
 const getEnv = (key: string) => {
-  const val = (window as any).process?.env?.[key] || (process as any).env?.[key] || '';
+  // ניסיון לקרוא מכמה מקומות אפשריים בהתאם לסביבת ההרצה
+  const val = (window as any).process?.env?.[key] || (process as any).env?.[key] || (import.meta as any).env?.[`VITE_${key}`] || '';
   return val.trim();
 };
 
@@ -119,13 +120,17 @@ const SHABAT_DISHES = [
 
 // --- DATABASE SERVICE ---
 const db = {
+  mask(str: string) {
+    if (!str || str.length < 8) return str || 'EMPTY';
+    return `${str.substring(0, 4)}...${str.substring(str.length - 4)}`;
+  },
   async runDetailedDiagnostics() {
     const report: any = {
-      supabaseUrl: { val: SUPABASE_URL, status: 'pending', note: '' },
-      supabaseKey: { val: SUPABASE_ANON_KEY, status: 'pending', note: '' },
-      clientInit: { status: 'pending', note: '' },
-      databaseAccess: { status: 'pending', note: '' },
-      emailJs: { status: 'pending', note: '' }
+      supabaseUrl: { val: SUPABASE_URL, status: 'pending', note: '', raw: '' },
+      supabaseKey: { val: SUPABASE_ANON_KEY, status: 'pending', note: '', raw: '' },
+      clientInit: { status: 'pending', note: '', raw: '' },
+      databaseAccess: { status: 'pending', note: '', raw: '' },
+      emailJs: { status: 'pending', note: '', raw: '' }
     };
 
     // 1. Check URL
@@ -137,17 +142,16 @@ const db = {
       report.supabaseUrl.note = 'כתובת URL לא תקינה (חייבת להתחיל ב-https)';
     } else {
       report.supabaseUrl.status = 'pass';
+      report.supabaseUrl.note = `URL זוהה: ${this.mask(SUPABASE_URL)}`;
     }
 
     // 2. Check Key
     if (!SUPABASE_ANON_KEY) {
       report.supabaseKey.status = 'fail';
       report.supabaseKey.note = 'חסר SUPABASE_ANON_KEY במשתני הסביבה';
-    } else if (SUPABASE_ANON_KEY.length < 50) {
-      report.supabaseKey.status = 'warning';
-      report.supabaseKey.note = 'המפתח נראה קצר מדי, בדוק שוב';
     } else {
       report.supabaseKey.status = 'pass';
+      report.supabaseKey.note = `Key זוהה: ${this.mask(SUPABASE_ANON_KEY)}`;
     }
 
     // 3. Client Init
@@ -155,32 +159,35 @@ const db = {
       report.clientInit.status = 'pass';
     } else {
       report.clientInit.status = 'fail';
-      report.clientInit.note = 'לא ניתן לאתחל את ה-Supabase Client עקב נתונים חסרים';
+      report.clientInit.note = 'לא ניתן לאתחל את הקליינט. וודא שהמפתחות מוזנים נכון.';
     }
 
     // 4. Actual DB Ping
     if (supabase) {
       try {
-        const { error } = await supabase.from('event_requests').select('count', { count: 'exact', head: true });
+        const { data, error, status, statusText } = await supabase.from('event_requests').select('count', { count: 'exact', head: true });
         if (error) {
           report.databaseAccess.status = 'fail';
-          report.databaseAccess.note = `שגיאת Supabase: ${error.message}. וודא שהטבלה event_requests קיימת ושיש לה RLS מאושר.`;
+          report.databaseAccess.note = `שגיאת Supabase (קוד ${status}): ${error.message}`;
+          report.databaseAccess.raw = JSON.stringify({ error, status, statusText }, null, 2);
         } else {
           report.databaseAccess.status = 'pass';
-          report.databaseAccess.note = 'החיבור לטבלה עובד מצוין!';
+          report.databaseAccess.note = 'החיבור לטבלה הצליח! הנתונים זורמים.';
         }
       } catch (e: any) {
         report.databaseAccess.status = 'fail';
-        report.databaseAccess.note = `שגיאת רשת: ${e.message}`;
+        report.databaseAccess.note = `שגיאת רשת קריטית: ${e.message}`;
+        report.databaseAccess.raw = e.stack;
       }
     }
 
     // 5. EmailJS Check
     if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
       report.emailJs.status = 'pass';
+      report.emailJs.note = `זוהה Template: ${this.mask(EMAILJS_TEMPLATE_ID)}`;
     } else {
       report.emailJs.status = 'warning';
-      report.emailJs.note = 'חלק ממשתני ה-EmailJS חסרים. המיילים לא יישלחו.';
+      report.emailJs.note = 'חלק מהגדרות EmailJS חסרות.';
     }
 
     return report;
@@ -232,6 +239,7 @@ const DiagnosticPanel = () => {
   const [report, setReport] = useState<any>(null);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
 
   const runDiagnostics = async () => {
     setLoading(true);
@@ -249,7 +257,7 @@ const DiagnosticPanel = () => {
     return <i className="fa-solid fa-circle-notch animate-spin" style={{color: '#94a3b8'}}></i>;
   };
 
-  const isAllPass = report && Object.values(report).every((r: any) => r.status === 'pass');
+  const isAllPass = report && Object.values(report).every((r: any) => r.status === 'pass' || r.status === 'warning');
 
   return (
     <div style={{
@@ -267,10 +275,8 @@ const DiagnosticPanel = () => {
           borderColor: isAllPass ? '#10b981' : '#ef4444',
           transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15) rotate(15deg)'}
-        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1) rotate(0deg)'}
       >
-        <i className={`fa-solid ${isAllPass ? 'fa-shield-check' : 'fa-stethoscope'}`} style={{
+        <i className={`fa-solid ${isAllPass ? 'fa-shield-heart' : 'fa-stethoscope'}`} style={{
           color: isAllPass ? '#10b981' : '#ef4444',
           fontSize: '24px'
         }}></i>
@@ -279,81 +285,61 @@ const DiagnosticPanel = () => {
       {/* הפאנל המורחב */}
       {expanded && (
         <div className="fade-in" style={{
-          position: 'absolute', bottom: '70px', left: '0', width: '380px',
+          position: 'absolute', bottom: '70px', left: '0', width: '400px',
           background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)',
           borderRadius: '28px', padding: '30px', boxShadow: '0 30px 100px rgba(0,0,0,0.3)',
           border: '1px solid rgba(0,0,0,0.08)', maxHeight: '80vh', overflowY: 'auto'
         }}>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px'}}>
-             <h4 style={{margin: 0, fontSize: '20px', fontWeight: 800}}>מרכז דיאגנוסטיקה</h4>
-             <button onClick={runDiagnostics} disabled={loading} style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gold)'}}>
-                <i className={`fa-solid fa-rotate ${loading ? 'animate-spin' : ''}`}></i>
-             </button>
+             <h4 style={{margin: 0, fontSize: '20px', fontWeight: 800}}>Deep Tracer Diagnostic</h4>
+             <div style={{display: 'flex', gap: '10px'}}>
+                <button onClick={() => setShowRaw(!showRaw)} style={{background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '12px'}}>
+                  {showRaw ? 'הסתר לוג' : 'הצג לוג שגיאה'}
+                </button>
+                <button onClick={runDiagnostics} disabled={loading} style={{background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gold)'}}>
+                    <i className={`fa-solid fa-rotate ${loading ? 'animate-spin' : ''}`}></i>
+                </button>
+             </div>
           </div>
           
           <div style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
-             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
-                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                   {getIcon(report?.supabaseUrl.status)}
-                   <div style={{fontSize: '14px'}}>
-                      <div style={{fontWeight: 700}}>כתובת Supabase URL</div>
-                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.supabaseUrl.note || 'הכתובת תקינה'}</div>
-                   </div>
+             {report && Object.entries(report).map(([key, data]: any) => (
+                <div key={key} style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
+                    <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
+                        {getIcon(data.status)}
+                        <div style={{fontSize: '14px', flexGrow: 1}}>
+                            <div style={{fontWeight: 700}}>{key}</div>
+                            <div style={{opacity: 0.8, fontSize: '12px', color: data.status === 'fail' ? '#ef4444' : 'inherit'}}>
+                                {data.note}
+                            </div>
+                            {showRaw && data.raw && (
+                                <pre style={{
+                                    fontSize: '10px', background: '#0f172a', color: '#10b981',
+                                    padding: '10px', borderRadius: '8px', marginTop: '10px',
+                                    whiteSpace: 'pre-wrap', wordBreak: 'break-all', overflowX: 'auto'
+                                }}>{data.raw}</pre>
+                            )}
+                        </div>
+                    </div>
                 </div>
-             </div>
-
-             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
-                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                   {getIcon(report?.supabaseKey.status)}
-                   <div style={{fontSize: '14px'}}>
-                      <div style={{fontWeight: 700}}>מפתח API (Anon Key)</div>
-                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.supabaseKey.note || 'המפתח הוגדר'}</div>
-                   </div>
-                </div>
-             </div>
-
-             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
-                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                   {getIcon(report?.clientInit.status)}
-                   <div style={{fontSize: '14px'}}>
-                      <div style={{fontWeight: 700}}>אתחול Supabase Client</div>
-                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.clientInit.note || 'הקליינט מוכן לפעולה'}</div>
-                   </div>
-                </div>
-             </div>
-
-             <div style={{borderBottom: '1px solid #eee', paddingBottom: '10px'}}>
-                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                   {getIcon(report?.databaseAccess.status)}
-                   <div style={{fontSize: '14px'}}>
-                      <div style={{fontWeight: 700}}>גישה לטבלה event_requests</div>
-                      <div style={{opacity: 0.8, fontSize: '12px', color: report?.databaseAccess.status === 'fail' ? '#ef4444' : 'inherit'}}>
-                        {report?.databaseAccess.note}
-                      </div>
-                   </div>
-                </div>
-             </div>
-
-             <div style={{paddingBottom: '10px'}}>
-                <div style={{display: 'flex', gap: '12px', alignItems: 'flex-start'}}>
-                   {getIcon(report?.emailJs.status)}
-                   <div style={{fontSize: '14px'}}>
-                      <div style={{fontWeight: 700}}>שירות EmailJS</div>
-                      <div style={{opacity: 0.6, fontSize: '12px'}}>{report?.emailJs.note || 'הגדרות המייל תקינות'}</div>
-                   </div>
-                </div>
-             </div>
+             ))}
           </div>
+
+          {!isAllPass && (
+              <div style={{marginTop: '20px', padding: '15px', background: '#fff1f2', borderRadius: '15px', border: '1px solid #fecaca', fontSize: '12px'}}>
+                  <strong>טיפ:</strong> וודא שהכנסת את המפתחות תחת השמות <code>SUPABASE_URL</code> ו-<code>SUPABASE_ANON_KEY</code> בדף הגדרות ה-Environment Variables של הפרויקט.
+              </div>
+          )}
 
           <button 
             onClick={() => setExpanded(false)}
             style={{
               width: '100%', marginTop: '20px', padding: '15px', 
-              borderRadius: '15px', border: 'none', background: '#f1f5f9',
-              fontWeight: 700, cursor: 'pointer'
+              borderRadius: '15px', border: 'none', background: 'var(--dark)',
+              color: 'white', fontWeight: 700, cursor: 'pointer'
             }}
           >
-            הבנתי, סגור
+            סגור פאנל
           </button>
         </div>
       )}
