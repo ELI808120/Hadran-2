@@ -1,29 +1,38 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter as Router, Routes, Route, Link, useParams, useNavigate, Navigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-/**
- * קייטרינג הדרן - גרסה 4.0 (The Masterpiece)
- * אפליקציה אחודה לניהול הזמנות יוקרה
+/** 
+ * קייטרינג הדרן - גרסה 5.0 (The Bulletproof Edition)
  */
 
-// --- חיבור ל-SUPABASE ---
-const getEnv = (key: string) => {
-  const env = (window as any).process?.env || (process as any).env || {};
-  return (env[key] || '').trim();
+// --- מנגנון זיהוי וניקוי מפתחות ---
+const getSanitizedEnv = (key: string) => {
+  const raw = (window as any).process?.env?.[key] || 
+              (process as any).env?.[key] || 
+              (import.meta as any).env?.[`VITE_${key}`] || 
+              '';
+  let val = raw.trim();
+  
+  if (key === 'SUPABASE_URL') {
+    // מונע מצב של https://https://
+    val = val.replace(/^(https?:\/\/)+/g, 'https://');
+    // מוודא שאין סלאש בסוף
+    if (val.endsWith('/')) val = val.slice(0, -1);
+  }
+  return val;
 };
 
-const URL = getEnv('SUPABASE_URL');
-const KEY = getEnv('SUPABASE_ANON_KEY');
+const SB_URL = getSanitizedEnv('SUPABASE_URL');
+const SB_KEY = getSanitizedEnv('SUPABASE_ANON_KEY');
 
-// אתחול הקליינט רק אם יש נתונים
-const supabase = (URL && KEY && URL.startsWith('http')) 
-  ? createClient(URL, KEY) 
+const supabase = (SB_URL && SB_KEY && SB_URL.includes('.')) 
+  ? createClient(SB_URL, SB_KEY) 
   : null;
 
-// --- נתונים: מנות שבת (קואורדינטות) ---
+// --- נתוני מנות (קואורדינטות) ---
 const SHABAT_DISHES = [
     {"id":"s1","name":"סלטים","top":7.85,"left":82.59,"width":3.97,"height":1.69},
     {"id":"s2","name":"בורגול","top":88.51,"left":79.69,"width":11.84,"height":1.14},
@@ -116,100 +125,85 @@ const SHABAT_DISHES = [
     {"id":"u3","name":"שניצל נסיכה","top":85.06,"left":37.23,"width":5.34,"height":1.14}
 ];
 
-// --- לוגיקת נתונים ---
+// --- שירות מסד נתונים (עם פולבאק) ---
 const db = {
-  async save(order: any) {
+  async save(data: any) {
     if (supabase) {
-      const { data, error } = await supabase.from('event_requests').insert([{ ...order, status: 'PENDING' }]).select().single();
-      if (error) throw error;
-      return data;
+      try {
+        const { data: res, error } = await supabase.from('event_requests').insert([{ ...data, status: 'PENDING' }]).select().single();
+        if (!error) return res;
+        console.error("Supabase Error:", error);
+      } catch (e) { console.error("Network Error:", e); }
     }
-    // פולבאק ללוקאל סטורג'
-    const current = JSON.parse(localStorage.getItem('orders') || '[]');
-    const newOrder = { ...order, id: 'local_' + Date.now(), status: 'PENDING', created_at: new Date().toISOString() };
-    localStorage.setItem('orders', JSON.stringify([...current, newOrder]));
-    return newOrder;
+    const store = JSON.parse(localStorage.getItem('hd_orders') || '[]');
+    const localItem = { ...data, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
+    localStorage.setItem('hd_orders', JSON.stringify([...store, localItem]));
+    return localItem;
   },
   async list() {
     if (supabase) {
       const { data, error } = await supabase.from('event_requests').select('*').order('created_at', { ascending: false });
       if (!error) return data;
     }
-    return JSON.parse(localStorage.getItem('orders') || '[]');
+    return JSON.parse(localStorage.getItem('hd_orders') || '[]');
   },
   async get(id: string) {
     if (supabase && !id.startsWith('local_')) {
       const { data, error } = await supabase.from('event_requests').select('*').eq('id', id).maybeSingle();
-      if (!error) return data;
+      if (!error && data) return data;
     }
-    return JSON.parse(localStorage.getItem('orders') || '[]').find((o: any) => o.id === id);
+    return JSON.parse(localStorage.getItem('hd_orders') || '[]').find((o: any) => o.id === id);
   },
   async update(id: string, updates: any) {
     if (supabase && !id.startsWith('local_')) {
-      const { error } = await supabase.from('event_requests').update(updates).eq('id', id);
-      if (error) throw error;
-      return;
+      await supabase.from('event_requests').update(updates).eq('id', id);
     }
-    const current = JSON.parse(localStorage.getItem('orders') || '[]');
-    const idx = current.findIndex((o: any) => o.id === id);
+    const store = JSON.parse(localStorage.getItem('hd_orders') || '[]');
+    const idx = store.findIndex((o: any) => o.id === id);
     if (idx !== -1) {
-      current[idx] = { ...current[idx], ...updates };
-      localStorage.setItem('orders', JSON.stringify(current));
+      store[idx] = { ...store[idx], ...updates };
+      localStorage.setItem('hd_orders', JSON.stringify(store));
     }
   }
 };
 
 // --- רכיבי ממשק ---
 
-const DiagnosticPanel = () => {
+const Diagnostics = () => {
   const [report, setReport] = useState<any>(null);
   const [open, setOpen] = useState(false);
 
   const check = async () => {
-    const res: any = { ok: false, msg: 'בודק...' };
-    if (!URL || !KEY) {
-      res.msg = 'חסרים משתני SUPABASE_URL או SUPABASE_ANON_KEY';
-    } else if (!supabase) {
-      res.msg = 'שגיאה באתחול הקליינט. בדוק את ה-URL.';
-    } else {
+    const r: any = { ok: false, msg: 'בודק...' };
+    if (!SB_URL || !SB_KEY) r.msg = 'מפתחות חסרים ב-Environment Variables';
+    else if (!supabase) r.msg = 'הקליינט לא אותחל. בדוק URL.';
+    else {
       try {
         const { error } = await supabase.from('event_requests').select('id').limit(1);
-        if (error) {
-          res.msg = `שגיאת Supabase: ${error.message} (קוד: ${error.code})`;
-        } else {
-          res.ok = true;
-          res.msg = 'מחובר לענן בהצלחה! ✅';
-        }
-      } catch (e: any) {
-        res.msg = `שגיאת רשת: ${e.message}`;
-      }
+        if (error) r.msg = `שגיאה: ${error.message} (${error.code})`;
+        else { r.ok = true; r.msg = 'החיבור ל-Supabase תקין! 🚀'; }
+      } catch (e: any) { r.msg = `שגיאת רשת: ${e.message}`; }
     }
-    setReport(res);
+    setReport(r);
   };
 
   useEffect(() => { check(); }, []);
 
   return (
-    <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 9999, direction: 'rtl' }}>
+    <div style={{ position: 'fixed', bottom: '20px', left: '20px', zIndex: 9999 }}>
       <button onClick={() => setOpen(!open)} style={{
-        width: '50px', height: '50px', borderRadius: '50%', background: report?.ok ? '#10b981' : '#ef4444', 
-        border: 'none', color: 'white', boxShadow: '0 10px 30px rgba(0,0,0,0.2)', cursor: 'pointer'
-      }}>
-        <i className={`fa-solid ${report?.ok ? 'fa-cloud' : 'fa-plug-circle-exclamation'}`}></i>
-      </button>
+        width: '45px', height: '45px', borderRadius: '50%', background: report?.ok ? '#10b981' : '#f43f5e',
+        color: 'white', border: 'none', boxShadow: '0 5px 15px rgba(0,0,0,0.2)', cursor: 'pointer'
+      }}><i className="fa-solid fa-key"></i></button>
       {open && (
-        <div style={{
-          position: 'absolute', bottom: '60px', left: 0, width: '300px', background: 'white',
-          padding: '20px', borderRadius: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', border: '1px solid #eee'
+        <div className="fade-in" style={{
+          position: 'absolute', bottom: '55px', left: 0, width: '280px', background: 'white',
+          padding: '20px', borderRadius: '15px', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', direction: 'rtl'
         }}>
-          <h4 style={{ margin: '0 0 10px 0' }}>דיאגנוסטיקה</h4>
-          <p style={{ fontSize: '13px', color: report?.ok ? '#10b981' : '#991b1b', fontWeight: 700 }}>{report?.msg}</p>
-          {!report?.ok && (
-            <div style={{ fontSize: '12px', marginTop: '10px', background: '#fef2f2', padding: '10px', borderRadius: '10px' }}>
-              <strong>טיפ:</strong> וודא שהרצת את קוד ה-SQL ב-Supabase ליצירת הטבלה event_requests.
-            </div>
-          )}
-          <button onClick={check} style={{ width: '100%', marginTop: '10px', padding: '8px', borderRadius: '8px', border: '1px solid #ddd', background: '#f8fafc', cursor: 'pointer' }}>בדוק שוב</button>
+          <h4 style={{ margin: '0 0 10px 0' }}>מצב חיבור</h4>
+          <p style={{ fontSize: '12px', color: report?.ok ? '#059669' : '#b91c1c' }}>{report?.msg}</p>
+          <div style={{ fontSize: '10px', opacity: 0.6, marginTop: '10px', wordBreak: 'break-all' }}>URL: {SB_URL}</div>
+          <button onClick={check} style={{ width: '100%', marginTop: '10px', padding: '5px', borderRadius: '5px', border: '1px solid #ddd', cursor: 'pointer' }}>בדוק שוב</button>
         </div>
       )}
     </div>
@@ -221,54 +215,47 @@ const Landing = () => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      await db.save(form);
-      setDone(true);
-    } catch (e: any) {
-      alert(`שגיאה: ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
+    await db.save(form);
+    setDone(true);
+    setLoading(false);
   };
 
   if (done) return (
-    <div className="fade-in" style={{ textAlign: 'center', padding: '150px 20px' }}>
-      <i className="fa-solid fa-circle-check" style={{ fontSize: '80px', color: '#10b981', marginBottom: '30px' }}></i>
-      <h2 className="font-serif" style={{ fontSize: '42px' }}>הבקשה התקבלה!</h2>
-      <p style={{ fontSize: '18px', color: '#64748b' }}>נחזור אליך בהקדם עם אישור ולינק לבחירת התפריט.</p>
-      <button onClick={() => setDone(false)} className="nav-btn" style={{ marginTop: '40px' }}>חזרה</button>
+    <div className="fade-in" style={{ textAlign: 'center', padding: '150px 5%' }}>
+      <i className="fa-solid fa-check-circle" style={{ fontSize: '70px', color: '#10b981', marginBottom: '20px' }}></i>
+      <h1 className="font-serif">הבקשה נשלחה!</h1>
+      <p>נחזור אליך בהקדם עם קישור לבחירת מנות.</p>
+      <button onClick={() => setDone(false)} className="nav-btn" style={{ marginTop: '30px' }}>חזרה</button>
     </div>
   );
 
   return (
     <div className="fade-in">
       <header style={{ 
-        height: '80vh', background: 'linear-gradient(rgba(15,23,42,0.8), rgba(15,23,42,0.8)), url("https://images.unsplash.com/photo-1555244162-803834f70033?w=1600")',
+        height: '75vh', background: 'linear-gradient(rgba(15,23,42,0.7), rgba(15,23,42,0.7)), url("https://images.unsplash.com/photo-1555244162-803834f70033?w=1600")',
         backgroundSize: 'cover', backgroundPosition: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', textAlign: 'center'
       }}>
-        <h1 className="font-serif" style={{ fontSize: 'clamp(4rem, 12vw, 8rem)', margin: 0 }}>קייטרינג <span style={{ color: 'var(--gold)' }}>הדרן</span></h1>
-        <p style={{ fontSize: '24px', opacity: 0.9, maxWidth: '700px', fontWeight: 300 }}>יוקרה קולינרית לאירועי בוטיק וכשרות מהדרין ללא פשרות.</p>
-        <a href="#booking" className="nav-btn" style={{ marginTop: '50px', padding: '20px 60px', fontSize: '20px' }}>הזמינו אירוע</a>
+        <h1 className="font-serif" style={{ fontSize: 'clamp(3.5rem, 10vw, 7rem)', margin: 0 }}>קייטרינג <span style={{ color: 'var(--gold)' }}>הדרן</span></h1>
+        <p style={{ fontSize: '22px', maxWidth: '600px', fontWeight: 300 }}>חווית אירוח יוקרתית בכשרות מהדרין</p>
+        <a href="#book" className="nav-btn" style={{ marginTop: '40px', padding: '18px 50px' }}>הזמן אירוע עכשיו</a>
       </header>
 
-      <section id="booking" style={{ padding: '100px 5%', marginTop: '-100px' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto', background: 'white', borderRadius: '40px', padding: '60px', boxShadow: '0 40px 100px rgba(0,0,0,0.1)' }}>
-          <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-            <h2 className="font-serif" style={{ fontSize: '32px' }}>שריון תאריך לאירוע</h2>
-            <p style={{ color: '#64748b' }}>מלאו את הפרטים ונשלח לכם גישה לבחירת מנות</p>
+      <section id="book" style={{ padding: '80px 5%', marginTop: '-120px' }}>
+        <div style={{ maxWidth: '850px', margin: '0 auto', background: 'white', borderRadius: '35px', padding: '50px', boxShadow: '0 30px 80px rgba(0,0,0,0.1)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <h2 className="font-serif" style={{ fontSize: '30px' }}>שריון תאריך ואירוע</h2>
           </div>
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
-            <input required placeholder="שם המארח" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} />
-            <input required placeholder="טלפון" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
-            <input required type="email" placeholder="אימייל" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-            <input required type="date" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.eventDate} onChange={e => setForm({...form, eventDate: e.target.value})} />
-            <input required placeholder="מיקום" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
-            <input required type="number" placeholder="כמות אורחים" style={{ padding: '18px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} value={form.guestCount} onChange={e => setForm({...form, guestCount: Number(e.target.value)})} />
-            <button disabled={loading} className="nav-btn" style={{ gridColumn: '1 / -1', padding: '22px', fontSize: '18px' }}>
-              {loading ? <i className="fa-solid fa-spinner animate-spin"></i> : 'שלח בקשה'}
+          <form onSubmit={onSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <input required placeholder="שם מלא" style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }} value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} />
+            <input required placeholder="טלפון" style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }} value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+            <input required type="email" placeholder="אימייל" style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }} value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+            <input required type="date" style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }} value={form.eventDate} onChange={e => setForm({...form, eventDate: e.target.value})} />
+            <input required placeholder="מיקום" style={{ padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', gridColumn: 'span 2' }} value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
+            <button disabled={loading} className="nav-btn" style={{ gridColumn: 'span 2', padding: '20px', fontSize: '18px' }}>
+              {loading ? 'מעבד...' : 'שלח בקשה'}
             </button>
           </form>
         </div>
@@ -281,30 +268,29 @@ const Admin = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const fetch = async () => {
     setLoading(true);
     const data = await db.list();
     setOrders(data);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { fetch(); }, []);
 
   if (loading) return <div className="loader-container"><div className="loader-spin"></div></div>;
 
   return (
-    <div className="fade-in" style={{ padding: '80px 5%', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '50px' }}>
-        <h1 className="font-serif" style={{ fontSize: '40px' }}>ניהול אירועים</h1>
-        <button onClick={load} className="nav-btn" style={{ background: 'var(--slate)' }}>רענן נתונים</button>
+    <div className="fade-in" style={{ padding: '60px 5%', maxWidth: '1100px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+        <h1 className="font-serif">ניהול הזמנות</h1>
+        <button onClick={fetch} className="nav-btn" style={{ background: '#334155' }}>רענן</button>
       </div>
-      <div style={{ background: 'white', borderRadius: '30px', overflow: 'hidden', border: '1px solid #eee' }}>
+      <div style={{ background: 'white', borderRadius: '25px', overflow: 'hidden', border: '1px solid #eee' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
           <thead style={{ background: '#f8fafc' }}>
             <tr>
               <th style={{ padding: '20px' }}>לקוח</th>
               <th style={{ padding: '20px' }}>תאריך</th>
-              <th style={{ padding: '20px' }}>סטטוס</th>
               <th style={{ padding: '20px' }}>פעולות</th>
             </tr>
           </thead>
@@ -312,25 +298,18 @@ const Admin = () => {
             {orders.map(o => (
               <tr key={o.id} style={{ borderTop: '1px solid #f1f5f9' }}>
                 <td style={{ padding: '20px' }}>
-                  <div style={{ fontWeight: 700 }}>{o.customerName}</div>
-                  <div style={{ fontSize: '12px', opacity: 0.5 }}>{o.phone}</div>
+                   <strong>{o.customerName}</strong><br/>
+                   <span style={{ fontSize: '12px', opacity: 0.5 }}>{o.phone}</span>
                 </td>
                 <td style={{ padding: '20px' }}>{new Date(o.eventDate).toLocaleDateString('he-IL')}</td>
                 <td style={{ padding: '20px' }}>
-                  <span style={{ 
-                    padding: '5px 15px', borderRadius: '50px', fontSize: '12px', fontWeight: 700,
-                    background: o.status === 'COMPLETED' ? '#dcfce7' : '#fef3c7',
-                    color: o.status === 'COMPLETED' ? '#166534' : '#92400e'
-                  }}>{o.status === 'COMPLETED' ? 'הושלם' : 'ממתין'}</span>
-                </td>
-                <td style={{ padding: '20px' }}>
-                  <Link to={`/order/${o.id}`} style={{ color: 'var(--gold)', fontWeight: 800, textDecoration: 'none' }}>ערוך תפריט</Link>
+                   <Link to={`/order/${o.id}`} style={{ color: 'var(--gold)', fontWeight: 700, textDecoration: 'none' }}>ערוך תפריט</Link>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {orders.length === 0 && <div style={{ padding: '100px', textAlign: 'center', opacity: 0.3 }}>אין הזמנות חדשות</div>}
+        {orders.length === 0 && <div style={{ padding: '60px', textAlign: 'center', opacity: 0.4 }}>אין הזמנות</div>}
       </div>
     </div>
   );
@@ -338,13 +317,12 @@ const Admin = () => {
 
 const MenuSelection = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [order, setOrder] = useState<any>(null);
   const [selections, setSelections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) db.get(id).then(res => {
+    db.get(id!).then(res => {
       if (res) {
         setOrder(res);
         if (res.selections?.dishes) setSelections(res.selections.dishes);
@@ -357,26 +335,21 @@ const MenuSelection = () => {
     setSelections(prev => prev.includes(sid) ? prev.filter(i => i !== sid) : [...prev, sid]);
   };
 
-  const handleSave = async () => {
-    try {
-      await db.update(id!, { selections: { dishes: selections }, status: 'COMPLETED' });
-      alert('הבחירות נשמרו בהצלחה!');
-      navigate('/');
-    } catch (e) { alert('שגיאה בשמירה'); }
+  const onSave = async () => {
+    await db.update(id!, { selections: { dishes: selections }, status: 'COMPLETED' });
+    alert('התפריט עודכן!');
   };
 
   if (loading) return <div className="loader-container"><div className="loader-spin"></div></div>;
 
   return (
     <div className="fade-in" style={{ padding: '50px 5%' }}>
-      <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-        <h1 className="font-serif">בחירת תפריט - {order?.customerName}</h1>
-        <p>לחצו על המנות בטופס הויזואלי לבחירה</p>
+      <div style={{ textAlign: 'center', marginBottom: '50px' }}>
+        <h1 className="font-serif">בחירת מנות - {order?.customerName}</h1>
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '50px', maxWidth: '1500px', margin: '0 auto' }}>
-        <div style={{ position: 'relative', background: 'white', padding: '15px', borderRadius: '30px', boxShadow: '0 20px 60px rgba(0,0,0,0.1)' }}>
-          <img src="https://images.unsplash.com/photo-1547928576-a4a33237eceb?w=1400" style={{ width: '100%', borderRadius: '20px', display: 'block' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '40px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ position: 'relative', background: 'white', padding: '10px', borderRadius: '25px', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}>
+          <img src="https://images.unsplash.com/photo-1547928576-a4a33237eceb?w=1400" style={{ width: '100%', borderRadius: '15px', display: 'block' }} />
           {SHABAT_DISHES.map(dish => (
             <div 
               key={dish.id} 
@@ -386,30 +359,28 @@ const MenuSelection = () => {
             />
           ))}
         </div>
-
-        <aside style={{ background: 'var(--dark)', color: 'white', padding: '40px', borderRadius: '40px', height: 'fit-content', position: 'sticky', top: '100px' }}>
-          <h3 className="font-serif" style={{ color: 'var(--gold)', fontSize: '24px', marginBottom: '25px' }}>מנות שנבחרו ({selections.length})</h3>
-          <div style={{ maxHeight: '450px', overflowY: 'auto', marginBottom: '30px' }}>
+        <aside style={{ background: '#0f172a', color: 'white', padding: '35px', borderRadius: '35px', height: 'fit-content', position: 'sticky', top: '100px' }}>
+          <h3 style={{ color: 'var(--gold)' }}>מנות שנבחרו ({selections.length})</h3>
+          <div style={{ maxHeight: '400px', overflowY: 'auto', margin: '20px 0' }}>
             {selections.map(sid => (
-              <div key={sid} style={{ background: 'rgba(255,255,255,0.05)', padding: '12px 15px', borderRadius: '12px', marginBottom: '10px', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
+              <div key={sid} style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', marginBottom: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between' }}>
                 {SHABAT_DISHES.find(d => d.id === sid)?.name}
-                <i className="fa-solid fa-xmark" style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => toggle(sid)}></i>
+                <i className="fa-solid fa-times" style={{ opacity: 0.3, cursor: 'pointer' }} onClick={() => toggle(sid)}></i>
               </div>
             ))}
           </div>
-          <button onClick={handleSave} className="nav-btn" style={{ width: '100%', padding: '20px', fontSize: '18px' }}>שמור בחירה</button>
+          <button onClick={onSave} className="nav-btn" style={{ width: '100%' }}>שמור תפריט</button>
         </aside>
       </div>
     </div>
   );
 };
 
-// --- אפליקציה ראשית ---
 const App = () => (
   <Router>
     <nav className="navbar">
-      <Link to="/" className="logo font-serif" style={{ textDecoration: 'none', color: 'var(--dark)', fontSize: '28px', fontWeight: 800 }}>קייטרינג <span style={{ color: 'var(--gold)' }}>הדרן</span></Link>
-      <Link to="/admin" style={{ textDecoration: 'none', color: 'var(--slate)', fontWeight: 700, fontSize: '15px' }}>ניהול</Link>
+      <Link to="/" className="logo font-serif" style={{ textDecoration: 'none', color: 'var(--dark)', fontSize: '26px', fontWeight: 800 }}>קייטרינג <span style={{ color: 'var(--gold)' }}>הדרן</span></Link>
+      <Link to="/admin" style={{ textDecoration: 'none', color: 'var(--slate)', fontWeight: 700 }}>ניהול</Link>
     </nav>
     <Routes>
       <Route path="/" element={<Landing />} />
@@ -417,7 +388,7 @@ const App = () => (
       <Route path="/order/:id" element={<MenuSelection />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
-    <DiagnosticPanel />
+    <Diagnostics />
   </Router>
 );
 
