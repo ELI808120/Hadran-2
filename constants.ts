@@ -1,3 +1,5 @@
+export const SUPABASE_URL = "https://shqzpmjjmspsyfftjmoo.supabase.co";
+export const SUPABASE_KEY = "sb_publishable_sRM1I07AR2nIAyW7AHyxQg_pWaUtGx-";
 
 import { MenuTemplate, Testimonial } from './types';
 

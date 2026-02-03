@@ -1,14 +1,8 @@
-
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_KEY } from '../constants';
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase credentials missing. App may not function correctly until configured.");
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.warn("פרטי ההתחברות של Supabase חסרים. ייתכן שהאפליקציה לא תפעל כראוי עד להגדרתם.");
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);

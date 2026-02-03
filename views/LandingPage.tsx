@@ -23,7 +23,7 @@ const LandingPage: React.FC = () => {
       setSubmitted(true);
     } catch (err) {
       console.error(err);
-      alert('אירעה שגיאה בשליחת הבקשה. אנא נסה שוב.');
+      alert(`אירעה שגיאה בשליחת הבקשה: ${(err as Error).message}`);
     } finally {
       setIsSubmitting(false);
     }
