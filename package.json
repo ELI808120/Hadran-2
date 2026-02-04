@@ -9,15 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.39.0",
+    "@supabase/supabase-js": "2.48.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "7.1.5",
-    "@supabase/supabase-js": "2.48.1",
-    "@google/genai": "^1.39.0"
+    "react-router-dom": "7.1.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "4.3.1",
+    "autoprefixer": "^10.4.24",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
     "vite": "^5.2.0"
   }
