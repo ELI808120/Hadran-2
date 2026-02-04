@@ -1,31 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import React from 'react';
+import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import LandingPage from './views/LandingPage';
 import MenuBuilder from './views/MenuBuilder';
 import AdminDashboard from './views/AdminDashboard';
-import Login from './views/Login';
-import { supabase } from './services/supabase';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loading) return null;
-
   return (
     <Router>
       <div className="min-h-screen bg-neutral-50 flex flex-col">
@@ -35,14 +15,7 @@ const App: React.FC = () => {
               <span className="text-3xl font-serif font-bold text-slate-900 tracking-tight">קייטרינג <span className="text-gold">הדרן</span></span>
             </Link>
             <div className="flex gap-8 items-center">
-              {user ? (
-                <div className="flex items-center gap-4">
-                  <Link to="/admin" className="text-slate-900 font-bold text-sm">ניהול אירועים</Link>
-                  <button onClick={() => supabase.auth.signOut()} className="text-neutral-400 text-sm hover:text-red-500 transition-colors">התנתק</button>
-                </div>
-              ) : (
-                <Link to="/login" className="text-neutral-500 hover:text-gold transition-colors text-sm font-medium">כניסת מנהל</Link>
-              )}
+              <Link to="/admin" className="text-slate-900 font-bold text-sm">ניהול אירועים</Link>
               <a href="#request-form" className="bg-gold text-white px-6 py-3 rounded-full text-sm font-bold shadow-md hover:bg-yellow-600 transition-all transform hover:scale-105 active:scale-95">הזמן אירוע עכשיו</a>
             </div>
           </div>
@@ -51,8 +24,7 @@ const App: React.FC = () => {
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={!user ? <Login /> : <Navigate to="/admin" />} />
-            <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/order/:orderId" element={<MenuBuilder />} />
           </Routes>
         </main>
