@@ -1,13 +1,14 @@
-
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import LandingPage from './views/LandingPage';
 import MenuBuilder from './views/MenuBuilder';
 import AdminDashboard from './views/AdminDashboard';
+import ScrollToTop from './src/ScrollToTop';
 
 const App: React.FC = () => {
   return (
     <Router>
+      <ScrollToTop />
       <div className="min-h-screen bg-neutral-50 flex flex-col">
         <nav className="bg-white border-b border-neutral-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
@@ -16,7 +17,7 @@ const App: React.FC = () => {
             </Link>
             <div className="flex gap-8 items-center">
               {/* <Link to="/admin" className="text-slate-900 font-bold text-sm">ניהול אירועים</Link> */}
-              <a href="#request-form" className="bg-gold text-white px-6 py-3 rounded-full text-sm font-bold shadow-md hover:bg-yellow-600 transition-all transform hover:scale-105 active:scale-95">הזמן אירוע עכשיו</a>
+              <a href="/#request-form" className="bg-gold text-white px-6 py-3 rounded-full text-sm font-bold shadow-md hover:bg-yellow-600 transition-all transform hover:scale-105 active:scale-95">הזמן אירוע עכשיו</a>
             </div>
           </div>
         </nav>
