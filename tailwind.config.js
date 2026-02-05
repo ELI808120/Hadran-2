@@ -5,7 +5,16 @@ export default {
     "./**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        gold: {
+          DEFAULT: '#d4af37',
+          light: '#f3e5ab',
+          dark: '#b8860b',
+        },
+        cream: '#fdfbf7',
+      }
+    },
   },
   plugins: [],
 }
