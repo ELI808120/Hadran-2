@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { EventRequest } from '../types';
@@ -18,8 +17,8 @@ const statusTranslations: { [key: string]: string } = {
   deposit_paid: "שולם מקדמה",
   completed: "בוצע",
   archived: "ארכיון",
-  confirmed: "מאושר", // Added from original
-  pending: "ממתין לאישור" // Added from original
+  confirmed: "מאושר",
+  pending: "ממתין לאישור"
 };
 
 const statusStyles: { [key: string]: string } = {
@@ -32,12 +31,11 @@ const statusStyles: { [key: string]: string } = {
   confirmed: 'bg-green-100 text-green-800 ring-green-600/20',
 };
 
-
 const AdminDashboard: React.FC = () => {
     const [viewMode, setViewMode] = useState('board');
     const [loading, setLoading] = useState(true);
-    const [requests, setRequests] = useState<EventRequest[]>([]); // Data for calendar
-    const [selectedEvent, setSelectedEvent] = useState<EventRequest | null>(null); // For modal
+    const [requests, setRequests] = useState<EventRequest[]>([]); 
+    const [selectedEvent, setSelectedEvent] = useState<EventRequest | null>(null); 
     const [columns, setColumns] = useState({
         new: { name: "פנייה חדשה", items: [] },
         quote_sent: { name: "נשלחה הצעת מחיר", items: [] },
@@ -48,7 +46,6 @@ const AdminDashboard: React.FC = () => {
         pending: { name: "ממתין לאישור", items: [] }
     });
     const [historyModal, setHistoryModal] = useState<{ isOpen: boolean, data: any[] }>({ isOpen: false, data: [] });
-
 
     useEffect(() => {
         loadRequests();
@@ -97,7 +94,6 @@ const AdminDashboard: React.FC = () => {
         const sourceColKey = source.droppableId;
         const destColKey = destination.droppableId;
 
-        // Optimistic UI update
         const sourceCol = columns[sourceColKey];
         const destCol = columns[destColKey];
         const sourceItems = [...sourceCol.items];
@@ -112,7 +108,6 @@ const AdminDashboard: React.FC = () => {
         };
         setColumns(newColumns);
         
-        // Also update the main \`requests\` array to keep calendar in sync
         const updatedRequests = requests.map(req => 
             req.id.toString() === draggableId 
                 ? { ...req, status: destColKey }
@@ -120,8 +115,6 @@ const AdminDashboard: React.FC = () => {
         );
         setRequests(updatedRequests);
 
-
-        // Update Supabase
         const newStatus = destination.droppableId;
         const updateData: { status: string; quote_sent_at?: string } = { status: newStatus };
 
@@ -136,7 +129,7 @@ const AdminDashboard: React.FC = () => {
 
         if (error) {
             alert("שגיאה בעדכון השרת!");
-            loadRequests(); // Revert on failure
+            loadRequests(); 
         }
     };
     
@@ -157,7 +150,7 @@ const AdminDashboard: React.FC = () => {
     };
 
     const calendarEvents = useMemo(() => requests.map(req => ({
-        title: \`\${req.customerName} - \${req.event_type}\`,
+        title: `${req.customerName} - ${req.event_type}`,
         start: new Date(req.eventDate),
         end: new Date(req.eventDate),
         resource: req,
@@ -168,10 +161,10 @@ const AdminDashboard: React.FC = () => {
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-4xl font-serif font-bold text-slate-900">ניהול אירועים</h1>
                 <div className="flex items-center gap-2 p-1 rounded-full bg-slate-200/80">
-                    <button onClick={() => setViewMode('board')} className={\`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-full transition-all \${viewMode === 'board' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}\`}>
+                    <button onClick={() => setViewMode('board')} className={`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-full transition-all ${viewMode === 'board' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}`}>
                         <i className='bx bxs-layout'></i> לוח
                     </button>
-                    <button onClick={() => setViewMode('calendar')} className={\`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-full transition-all \${viewMode === 'calendar' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}\`}>
+                    <button onClick={() => setViewMode('calendar')} className={`px-5 py-2.5 text-sm font-bold flex items-center gap-2 rounded-full transition-all ${viewMode === 'calendar' ? 'bg-white text-slate-900 shadow' : 'text-slate-500'}`}>
                         <i className='bx bxs-calendar'></i> יומן
                     </button>
                 </div>
@@ -203,7 +196,7 @@ const AdminDashboard: React.FC = () => {
                                                                         ref={provided.innerRef}
                                                                         {...provided.draggableProps}
                                                                         {...provided.dragHandleProps}
-                                                                        className={\`p-4 mb-3 rounded-lg shadow-sm transition-shadow \${snapshot.isDragging ? 'shadow-lg' : 'shadow-sm'} \${isUrgent ? 'border-2 border-red-500 bg-red-50/50' : 'bg-white'}\`}
+                                                                        className={`p-4 mb-3 rounded-lg shadow-sm transition-shadow ${snapshot.isDragging ? 'shadow-lg' : 'shadow-sm'} ${isUrgent ? 'border-2 border-red-500 bg-red-50/50' : 'bg-white'}`}
                                                                     >
                                                                         <h4 className="font-bold text-slate-800">{item.customerName}</h4>
                                                                         <p className="text-sm text-slate-600">{item.event_type}</p>
@@ -231,11 +224,11 @@ const AdminDashboard: React.FC = () => {
                             startAccessor="start"
                             endAccessor="end"
                             eventPropGetter={(event: any) => {
-                                const statusClass = \`status-\${event.resource.status}\`;
+                                const statusClass = `status-${event.resource.status}`;
                                 return { className: statusClass };
                             }}
                             messages={{
-                                next: "הבא", previous: "הקודם", today: "היום", month: "חודש", week: "שבוע", day: "יום", agenda: "אג'נדה", date: "תאריך", time: "שעה", event: "אירוע", noEventsInRange: "אין אירועים בטווח זה.", showMore: total => \`+\${total}\`
+                                next: "הבא", previous: "הקודם", today: "היום", month: "חודש", week: "שבוע", day: "יום", agenda: "אג'נדה", date: "תאריך", time: "שעה", event: "אירוע", noEventsInRange: "אין אירועים בטווח זה.", showMore: total => `+${total}`
                             }}
                         />
                     )}
@@ -261,7 +254,7 @@ const AdminDashboard: React.FC = () => {
                                             <td className="p-3 border-b border-slate-100">{new Date(event.event_date).toLocaleDateString('he-IL')}</td>
                                             <td className="p-3 border-b border-slate-100">{event.event_type}</td>
                                             <td className="p-3 border-b border-slate-100">
-                                                <span className={\`px-3 py-1.5 text-xs font-bold rounded-full ring-1 ring-inset \${statusStyles[event.status] || 'bg-gray-100 text-gray-800'}\`}>
+                                                <span className={`px-3 py-1.5 text-xs font-bold rounded-full ring-1 ring-inset ${statusStyles[event.status] || 'bg-gray-100 text-gray-800'}`}>
                                                     {statusTranslations[event.status] || event.status}
                                                 </span>
                                             </td>
@@ -283,7 +276,7 @@ const AdminDashboard: React.FC = () => {
                                 <h2 className="text-2xl font-bold mb-1 text-slate-800">{selectedEvent.customerName}</h2>
                                 <p className="text-slate-500">{selectedEvent.location}</p>
                             </div>
-                            <span className={\`px-3 py-1.5 text-xs font-bold rounded-full ring-1 ring-inset \${statusStyles[selectedEvent.status]}\`}>
+                            <span className={`px-3 py-1.5 text-xs font-bold rounded-full ring-1 ring-inset ${statusStyles[selectedEvent.status]}`}>
                                 {statusTranslations[selectedEvent.status]}
                             </span>
                         </div>
