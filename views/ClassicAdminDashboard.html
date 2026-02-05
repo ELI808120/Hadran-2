@@ -3,88 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ניהול בקשות אירועים</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root { --primary: #3ecf8e; --dark: #1c1c1c; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; margin: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: var(--dark); border-bottom: 3px solid var(--primary); display: inline-block; padding-bottom: 5px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
-        th { background-color: var(--primary); color: white; padding: 12px; text-align: right; }
-        td { padding: 12px; border-bottom: 1px solid #ddd; }
-        tr:hover { background-color: #f1f1f1; }
-        
-        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-approved { background: #d4edda; color: #155724; }
-        
-        #loader { text-align: center; padding: 20px; font-style: italic; color: #666; }
-    </style>
+    <title>ממשק ניהול הזמנות</title>
 </head>
 <body>
+    <h1>הזמנות אחרונות</h1>
+    <div id="orders-container">
+        <p>טוען הזמנות...</p>
+    </div>
+    <div id="last-updated"></div>
 
-<div class="container">
-    <h1>רשימת בקשות לאירועים</h1>
-    <div id="loader">טוען נתונים מהשרת...</div>
-    
-    <table id="events-table" style="display: none;">
-        <thead>
-            <tr>
-                <th>לקוח</th>
-                <th>תאריך אירוע</th>
-                <th>מיקום</th>
-                <th>אורחים</th>
-                <th>סטטוס</th>
-                <th>פרטי תפריט</th>
-            </tr>
-        </thead>
-        <tbody id="table-body">
-            </tbody>
-    </table>
-</div>
-
-<script>
-    const SUPABASE_URL = "https://shqzpmjjmspsyfftjmoo.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_sRM1I07AR2nIAyW7AHyxQg_pWaUtGx-";
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    async function loadEvents() {
-        const { data, error } = await supabaseClient
-            .from('event_requests')
-            .select('*')
-            .order('event_date', { ascending: true });
-
-        if (error) {
-            document.getElementById('loader').innerHTML = "שגיאה בטעינה: " + error.message;
-            return;
-        }
-
-        const tableBody = document.getElementById('table-body');
-        document.getElementById('loader').style.display = 'none';
-        document.getElementById('events-table').style.display = 'table';
-
-        data.forEach(event => {
-            const row = document.createElement('tr');
-            
-            // עיבוד סטטוס
-            const statusClass = event.status === 'pending' ? 'status-pending' : 'status-approved';
-            
-            row.innerHTML = `
-                <td><strong>${event.customer_name}</strong><br><small>${event.email}</small></td>
-                <td>${new Date(event.event_date).toLocaleDateString('he-IL')}</td>
-                <td>${event.location}</td>
-                <td>${event.guest_count}</td>
-                <td><span class="status-badge ${statusClass}">${event.status || 'חדש'}</span></td>
-                <td>${event.selected_menu_id || '-'}</td>
-            `;
-            tableBody.appendChild(row);
-        });
-    }
-
-    loadEvents();
-</script>
-
+    <script type="module" src="/admin.ts"></script>
 </body>
 </html>
