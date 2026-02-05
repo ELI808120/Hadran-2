@@ -15,7 +15,7 @@ const App: React.FC = () => {
               <span className="text-3xl font-serif font-bold text-slate-900 tracking-tight">קייטרינג <span className="text-gold">הדרן</span></span>
             </Link>
             <div className="flex gap-8 items-center">
-              <Link to="/admin" className="text-slate-900 font-bold text-sm">ניהול אירועים</Link>
+              {/* <Link to="/admin" className="text-slate-900 font-bold text-sm">ניהול אירועים</Link> */}
               <a href="#request-form" className="bg-gold text-white px-6 py-3 rounded-full text-sm font-bold shadow-md hover:bg-yellow-600 transition-all transform hover:scale-105 active:scale-95">הזמן אירוע עכשיו</a>
             </div>
           </div>
