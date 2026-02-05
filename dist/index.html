@@ -5,133 +5,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>קייטרינג הדרן - יוקרה קולינרית</title>
-    <link rel="shortcut icon" href="#">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;400;600;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    
-    <style>
-      :root {
-        --gold: #d4af37;
-        --gold-light: #f3e5ab;
-        --gold-dark: #b8860b;
-        --dark: #0f172a;
-        --slate: #334155;
-        --cream: #fdfbf7;
-        --white: #ffffff;
-      }
-
-      * { box-sizing: border-box; scroll-behavior: smooth; }
-      body { 
-        margin: 0; 
-        font-family: 'Assistant', sans-serif; 
-        background-color: var(--cream); 
-        color: var(--dark);
-        line-height: 1.6;
-        overflow-x: hidden;
-      }
-
-      .font-serif { font-family: 'Playfair Display', serif; }
-      
-      /* Navbar Customization */
-      .navbar {
-        height: 80px;
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 5%;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        box-shadow: 0 2px 20px rgba(0,0,0,0.05);
-      }
-      
-      .nav-btn {
-        background: var(--gold);
-        color: white;
-        padding: 12px 30px;
-        border-radius: 50px;
-        text-decoration: none;
-        font-weight: 700;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        border: none;
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-      }
-      .nav-btn:hover { 
-        background: var(--gold-dark); 
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
-      }
-
-      /* Transitions */
-      .fade-in { animation: fadeIn 0.8s ease-out forwards; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-
-      /* Loader */
-      .loader-container {
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: var(--cream);
-      }
-      .loader-spin {
-        width: 50px;
-        height: 50px;
-        border: 3px solid rgba(212, 175, 55, 0.1);
-        border-top: 3px solid var(--gold);
-        border-radius: 50%;
-        animation: spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-      }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-      /* Hotspots */
-      .dish-hotspot {
-        position: absolute;
-        cursor: pointer;
-        border: 1.5px solid transparent;
-        transition: all 0.25s ease;
-        z-index: 10;
-        border-radius: 4px;
-      }
-      .dish-hotspot:hover {
-        background: rgba(212, 175, 55, 0.15);
-        border-color: var(--gold);
-      }
-      .dish-hotspot.selected {
-        background: rgba(212, 175, 55, 0.35);
-        border: 2px solid var(--gold);
-        box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
-      }
-    </style>
-
-
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "react-router-dom": "https://esm.sh/react-router-dom@7.1.5?external=react",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.39.0"
-  }
-}
-</script>
-    <script type="module" crossorigin src="/assets/index-D9Ffao6t.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B4xN0RXm.css">
+    <script type="module" crossorigin src="/assets/index-CTz5lDYg.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-ja2UERSY.css">
   </head>
   <body>
     <div id="root">
-      <div class="loader-container">
-        <div class="loader-spin"></div>
-        <p style="margin-top: 20px; font-weight: 600; color: var(--gold);">קייטרינג הדרן - מעצבים עבורכם אירוע...</p>
+      <div class="loader-container" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Assistant', sans-serif; background: #fdfbf7;">
+        <div class="loader-spin" style="width: 50px; height: 50px; border: 3px solid rgba(212, 175, 55, 0.1); border-top: 3px solid #d4af37; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 20px; font-weight: 600; color: #d4af37;">קייטרינג הדרן - מעצבים עבורכם אירוע...</p>
       </div>
+      <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
     </div>
   </body>
 </html>
